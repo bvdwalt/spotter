@@ -1,10 +1,11 @@
-import { api, type ClientConfig, type Contact, type Kind, type Position, type Status } from "./api";
+import { api, type Alert, type ClientConfig, type Contact, type Kind, type Position, type Status } from "./api";
 import { searchTerms } from "./airlines";
 
 class ContactStore {
   config = $state<ClientConfig | null>(null);
   contacts = $state<Contact[]>([]);
   status = $state<Status | null>(null);
+  alerts = $state<Alert[]>([]);
   selectedId = $state<string | null>(null);
   track = $state<Position[]>([]);
   hideGround = $state(true);
@@ -37,9 +38,10 @@ class ContactStore {
     this.config = await api.config();
     const tick = async () => {
       try {
-        const [list, status] = await Promise.all([api.contacts(), api.status()]);
+        const [list, status, alerts] = await Promise.all([api.contacts(), api.status(), api.alerts()]);
         this.contacts = list.contacts;
         this.status = status;
+        this.alerts = alerts.alerts;
         this.now = Date.now();
         this.error = null;
         if (this.selectedId) {

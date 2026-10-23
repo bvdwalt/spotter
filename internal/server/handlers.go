@@ -53,6 +53,14 @@ func (h *handlers) status(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+func (h *handlers) alerts(w http.ResponseWriter, r *http.Request) {
+	recent := h.Alerts.Recent()
+	for i, j := 0, len(recent)-1; i < j; i, j = i+1, j-1 {
+		recent[i], recent[j] = recent[j], recent[i]
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"alerts": recent})
+}
+
 func (h *handlers) config(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, h.Config)
 }

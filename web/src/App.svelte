@@ -1,6 +1,7 @@
 <script lang="ts">
   import Map from "./lib/Map.svelte";
   import Panel from "./lib/Panel.svelte";
+  import Alerts from "./lib/Alerts.svelte";
   import Table from "./lib/Table.svelte";
   import { store } from "./lib/contacts.svelte";
   import { ageText } from "./lib/format";
@@ -44,6 +45,7 @@
         {/each}
       {/if}
     </div>
+    <Alerts />
     <Panel />
     <div class="table-wrap">
       <Table />

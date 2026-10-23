@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/bvdwalt/spotter/internal/alert"
 	"github.com/bvdwalt/spotter/internal/model"
 	"github.com/bvdwalt/spotter/internal/track"
 	"github.com/bvdwalt/spotter/web"
@@ -25,6 +26,7 @@ type ClientConfig struct {
 
 type Deps struct {
 	Store   *track.Store
+	Alerts  *alert.Engine
 	Sources []model.StatusReporter
 	Config  ClientConfig
 	Version string
@@ -42,6 +44,7 @@ func New(d Deps) http.Handler {
 		r.Get("/contacts", h.contacts)
 		r.Get("/contacts/{id}/track", h.track)
 		r.Get("/status", h.status)
+		r.Get("/alerts", h.alerts)
 		r.Get("/config", h.config)
 	})
 	r.Handle("/*", spaHandler())

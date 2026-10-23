@@ -10,6 +10,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/bvdwalt/spotter/internal/alert"
 	"github.com/bvdwalt/spotter/internal/config"
 	"github.com/bvdwalt/spotter/internal/model"
 	"github.com/bvdwalt/spotter/internal/server"
@@ -26,6 +27,15 @@ func run(ctx context.Context, cfg *config.Config) error {
 		AircraftExpiry: cfg.AircraftExpiry, VesselExpiry: cfg.VesselExpiry,
 		TrackWindow: cfg.TrackWindow, TrackMinInterval: cfg.TrackMinInterval,
 	})
+
+	var sink alert.Sink
+	if cfg.NtfyURL != "" {
+		sink = alert.NewNtfy(cfg.NtfyURL, cfg.NtfyToken)
+		slog.Info("alerts to ntfy enabled")
+	} else {
+		slog.Info("NTFY_URL not set, alerts shown in the UI only")
+	}
+	alerts := alert.New(alert.Options{WatchList: cfg.WatchList, Cooldown: cfg.AlertCooldown}, sink)
 
 	adsbSource := adsb.New(cfg.ADSBBaseURL, cfg.HomeLat, cfg.HomeLon, cfg.RadiusNM, cfg.ADSBPollInterval)
 	sources := []model.StatusReporter{adsbSource}
@@ -56,7 +66,10 @@ func run(ctx context.Context, cfg *config.Config) error {
 			case <-ctx.Done():
 				return
 			case c := <-updates:
-				store.Upsert(c)
+				stored := store.Upsert(c)
+				for _, a := range alerts.Observe(ctx, stored) {
+					slog.Info("alert", "rule", a.Rule, "contact", a.ContactID, "title", a.Title)
+				}
 			case now := <-sweep.C:
 				store.Sweep(now)
 			}
@@ -67,6 +80,7 @@ func run(ctx context.Context, cfg *config.Config) error {
 		Addr: ":" + cfg.Port,
 		Handler: server.New(server.Deps{
 			Store:   store,
+			Alerts:  alerts,
 			Sources: sources,
 			Version: version,
 			Config: server.ClientConfig{

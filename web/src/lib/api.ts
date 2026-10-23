@@ -61,6 +61,16 @@ export interface Status {
   contacts: Record<Kind, number>;
 }
 
+export interface Alert {
+  rule: "emergency" | "military" | "watchlist";
+  contact_id: string;
+  label: string;
+  kind: Kind;
+  title: string;
+  message: string;
+  time: string;
+}
+
 async function getJSON<T>(path: string): Promise<T> {
   const r = await fetch(path);
   if (!r.ok) throw new Error(`${path}: HTTP ${r.status}`);
@@ -72,4 +82,5 @@ export const api = {
   contacts: () => getJSON<{ now: string; contacts: Contact[] }>("/api/contacts"),
   track: (id: string) => getJSON<{ positions: Position[] }>(`/api/contacts/${encodeURIComponent(id)}/track`),
   status: () => getJSON<Status>("/api/status"),
+  alerts: () => getJSON<{ alerts: Alert[] }>("/api/alerts"),
 };

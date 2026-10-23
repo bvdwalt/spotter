@@ -34,7 +34,8 @@ func New(opts Options) *Store {
 }
 
 // Upsert replaces the contact and appends its position to the track if enough time has passed.
-func (s *Store) Upsert(c model.Contact) {
+// It returns the stored contact, with distance and carried-over static fields filled in.
+func (s *Store) Upsert(c model.Contact) model.Contact {
 	c.DistanceKm = haversineKm(s.opts.HomeLat, s.opts.HomeLon, c.Lat, c.Lon)
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -63,6 +64,7 @@ func (s *Store) Upsert(c model.Contact) {
 		i++
 	}
 	e.track = e.track[i:]
+	return c
 }
 
 // Sweep drops contacts whose last sighting is older than their kind's expiry.

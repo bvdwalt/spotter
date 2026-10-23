@@ -34,6 +34,10 @@ docker run -p 8080:8080 -e HOME_LAT=-26.2 -e HOME_LON=28.05 spotter
 | `VESSEL_EXPIRY` | `15m` | |
 | `TRACK_WINDOW` | `15m` | recent positions kept per contact |
 | `TRACK_MIN_INTERVAL` | `10s` | downsample interval for tracks |
+| `NTFY_URL` | empty | ntfy topic URL for alerts; empty keeps alerts in the UI only |
+| `NTFY_TOKEN` | empty | bearer token for ntfy, if the topic needs one |
+| `WATCH_LIST` | empty | comma-separated ICAO hex codes and MMSIs to alert on |
+| `ALERT_COOLDOWN` | `1h` | minimum gap between repeat alerts for one contact and rule |
 
 ## API
 
@@ -43,7 +47,15 @@ docker run -p 8080:8080 -e HOME_LAT=-26.2 -e HOME_LON=28.05 spotter
 | `GET /api/contacts` | current contacts |
 | `GET /api/contacts/{id}/track` | recent positions for one contact |
 | `GET /api/status` | per-source health and contact counts |
+| `GET /api/alerts` | recent alerts, newest first |
 | `GET /api/config` | home point, radius, expiry values for the UI |
+
+## Alerts
+
+Three rules, evaluated on every update: emergency squawks (7500, 7600, 7700),
+aircraft flagged military by the aggregator, and contacts on `WATCH_LIST`. Each
+alert shows in the sidebar and, when `NTFY_URL` is set, is posted to ntfy with a
+title, tags, and high priority for emergencies.
 
 ## Development
 

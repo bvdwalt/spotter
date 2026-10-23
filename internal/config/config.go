@@ -18,6 +18,10 @@ type Config struct {
 	ADSBPollInterval time.Duration
 	AISStreamAPIKey  string
 	AISBBox          [2][2]float64 // [[latSW, lonSW], [latNE, lonNE]]
+	NtfyURL          string
+	NtfyToken        string
+	WatchList        []string
+	AlertCooldown    time.Duration
 	AircraftExpiry   time.Duration
 	VesselExpiry     time.Duration
 	TrackWindow      time.Duration
@@ -29,6 +33,11 @@ func Load() (*Config, error) {
 		Port:            getEnv("PORT", "8080"),
 		ADSBBaseURL:     getEnv("ADSB_BASE_URL", "https://api.adsb.lol/v2"),
 		AISStreamAPIKey: os.Getenv("AISSTREAM_API_KEY"),
+		NtfyURL:         os.Getenv("NTFY_URL"),
+		NtfyToken:       os.Getenv("NTFY_TOKEN"),
+	}
+	if v := os.Getenv("WATCH_LIST"); v != "" {
+		cfg.WatchList = strings.Split(v, ",")
 	}
 	var err error
 	if cfg.HomeLat, err = requireFloat("HOME_LAT"); err != nil {
@@ -53,6 +62,7 @@ func Load() (*Config, error) {
 		{&cfg.VesselExpiry, "VESSEL_EXPIRY", 15 * time.Minute},
 		{&cfg.TrackWindow, "TRACK_WINDOW", 15 * time.Minute},
 		{&cfg.TrackMinInterval, "TRACK_MIN_INTERVAL", 10 * time.Second},
+		{&cfg.AlertCooldown, "ALERT_COOLDOWN", time.Hour},
 	}
 	for _, d := range durations {
 		if *d.dst, err = durationEnv(d.key, d.def); err != nil {
