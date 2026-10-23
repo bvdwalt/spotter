@@ -28,15 +28,6 @@ archives:
     files:
       - LICENSE
 
-homebrew_casks:
-  - repository:
-      owner: bvdwalt
-      name: homebrew-tap
-      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
-    homepage: "https://github.com/bvdwalt/spotter"
-    description: "Lightweight live map of nearby aircraft and ships"
-    license: "MIT"
-
 # Docker — remove this section if not publishing a Docker image
 dockers_v2:
   - id: ghcr
