@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -133,5 +134,24 @@ func TestBasemapRange(t *testing.T) {
 	}
 	if code, _ := get(t, newTestServer(), "/basemap.pmtiles"); code == http.StatusPartialContent {
 		t.Error("without PMTiles the route should fall through to the SPA")
+	}
+}
+
+func TestMetrics(t *testing.T) {
+	rec := httptest.NewRecorder()
+	newTestServer().ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/metrics", nil))
+	body := rec.Body.String()
+	for _, want := range []string{
+		`spotter_contacts{kind="aircraft"} 1`,
+		`spotter_source_up{source="fake"} 0`,
+		"# TYPE spotter_source_polls_total counter",
+		"spotter_alerts_recent 1",
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("metrics missing %q in:\n%s", want, body)
+		}
+	}
+	if ct := rec.Header().Get("Content-Type"); !strings.HasPrefix(ct, "text/plain") {
+		t.Errorf("content type %q", ct)
 	}
 }

@@ -26,7 +26,7 @@ docker run -p 8080:8080 -e HOME_LAT=-26.2 -e HOME_LON=28.05 spotter
 | `PORT` | `8080` | |
 | `HOME_LAT`, `HOME_LON` | required | centre of the region |
 | `RADIUS_NM` | `150` | aircraft query radius, max 250 |
-| `ADSB_BASE_URL` | `https://opendata.adsb.fi/api/v2` | `https://api.adsb.lol/v2` also works, but caps at 500 requests a day |
+| `ADSB_BASE_URL` | `https://opendata.adsb.fi/api/v2` | `https://api.adsb.lol/v2` also works (500 requests a day); a local receiver's `http://host/data/aircraft.json` is filtered to the radius |
 | `ADSB_POLL_INTERVAL` | `5s` | adsb.fi allows one request per second |
 | `AISSTREAM_API_KEY` | empty | from [aisstream.io](https://aisstream.io); ships disabled when empty |
 | `AIS_BBOX` | derived from home and radius | `latSW,lonSW,latNE,lonNE`, for example a coastal box when home is inland |
@@ -47,6 +47,7 @@ docker run -p 8080:8080 -e HOME_LAT=-26.2 -e HOME_LON=28.05 spotter
 | Path | Purpose |
 |---|---|
 | `GET /health` | liveness, always 200 while the process runs |
+| `GET /metrics` | Prometheus text format: contacts, source health, alerts |
 | `GET /api/contacts` | current contacts |
 | `GET /api/contacts/{id}/track` | recent positions for one contact |
 | `GET /api/contacts/{id}/photo` | first planespotters.net photo for an aircraft |

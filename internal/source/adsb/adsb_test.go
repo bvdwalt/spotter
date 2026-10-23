@@ -133,3 +133,27 @@ func TestPointURLShapes(t *testing.T) {
 		t.Errorf("adsb.fi url = %s", got)
 	}
 }
+
+func TestLocalAircraftJSONFiltersByRadius(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/data/aircraft.json" {
+			http.NotFound(w, r)
+			return
+		}
+		http.ServeFile(w, r, "testdata/point.json") // fixture aircraft are all around Johannesburg
+	}))
+	defer srv.Close()
+	near := New(srv.URL+"/data/aircraft.json", -26.2, 28.05, 150, time.Second)
+	got, err := near.Poll(context.Background())
+	if err != nil || len(got) == 0 {
+		t.Fatalf("near: %d %v", len(got), err)
+	}
+	far := New(srv.URL+"/data/aircraft.json", -33.9, 18.4, 50, time.Second)
+	got, err = far.Poll(context.Background())
+	if err != nil || len(got) != 0 {
+		t.Fatalf("far: want 0 contacts, got %d %v", len(got), err)
+	}
+	if near.Name() == "" {
+		t.Error("name should derive from the host")
+	}
+}

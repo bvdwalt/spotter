@@ -120,7 +120,39 @@ func (s *Source) Poll(ctx context.Context) ([]model.Contact, error) {
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("unexpected status %d", resp.StatusCode)
 	}
-	return Parse(json.NewDecoder(resp.Body), s.Name(), time.Now())
+	contacts, err := Parse(json.NewDecoder(resp.Body), s.Name(), time.Now())
+	if err != nil {
+		return nil, err
+	}
+	if s.isLocalFile() {
+		contacts = s.withinRadius(contacts)
+	}
+	return contacts, nil
+}
+
+// isLocalFile reports whether BaseURL points straight at a readsb/tar1090 aircraft.json,
+// which returns everything the receiver hears rather than a point query.
+func (s *Source) isLocalFile() bool {
+	return strings.HasSuffix(s.BaseURL, ".json")
+}
+
+func (s *Source) withinRadius(contacts []model.Contact) []model.Contact {
+	out := contacts[:0]
+	for _, c := range contacts {
+		if haversineNM(s.Lat, s.Lon, c.Lat, c.Lon) <= s.RadiusNM {
+			out = append(out, c)
+		}
+	}
+	return out
+}
+
+func haversineNM(lat1, lon1, lat2, lon2 float64) float64 {
+	const earthNM = 3440.065
+	toRad := func(d float64) float64 { return d * math.Pi / 180 }
+	dLat := toRad(lat2 - lat1)
+	dLon := toRad(lon2 - lon1)
+	a := math.Sin(dLat/2)*math.Sin(dLat/2) + math.Cos(toRad(lat1))*math.Cos(toRad(lat2))*math.Sin(dLon/2)*math.Sin(dLon/2)
+	return 2 * earthNM * math.Asin(math.Sqrt(a))
 }
 
 // retryAfter reads Retry-After (seconds) or x-ratelimit-reset, bounded to something sane.
@@ -135,6 +167,9 @@ func retryAfter(h http.Header, fallback time.Duration) time.Duration {
 
 // pointURL builds the point query. adsb.fi uses a different path from the readsb-style aggregators.
 func (s *Source) pointURL() string {
+	if s.isLocalFile() {
+		return s.BaseURL
+	}
 	radius := int(math.Round(s.RadiusNM))
 	if strings.Contains(s.BaseURL, "adsb.fi") {
 		return fmt.Sprintf("%s/lat/%s/lon/%s/dist/%d", s.BaseURL, fmtCoord(s.Lat), fmtCoord(s.Lon), radius)

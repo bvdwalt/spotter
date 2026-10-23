@@ -43,6 +43,7 @@ func New(d Deps) http.Handler {
 
 	h := &handlers{d}
 	r.Get("/health", healthHandler)
+	r.Get("/metrics", h.metrics)
 	r.Route("/api", func(r chi.Router) {
 		r.Use(middleware.NoCache)
 		r.Get("/contacts", h.contacts)

@@ -2,8 +2,10 @@ package server
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/url"
+	"sort"
 	"strings"
 	"time"
 
@@ -128,6 +130,46 @@ func (h *handlers) unwatch(w http.ResponseWriter, r *http.Request) {
 	}
 	h.Alerts.Unwatch(id)
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// metrics writes Prometheus text format by hand; the counters are few enough that a client library is not worth it.
+func (h *handlers) metrics(w http.ResponseWriter, r *http.Request) {
+	var b strings.Builder
+	write := func(name, help, kind string, rows ...string) {
+		fmt.Fprintf(&b, "# HELP %s %s\n# TYPE %s %s\n", name, help, name, kind)
+		for _, row := range rows {
+			b.WriteString(row + "\n")
+		}
+	}
+	var contacts []string
+	for kind, n := range h.Store.Counts() {
+		contacts = append(contacts, fmt.Sprintf(`spotter_contacts{kind=%q} %d`, kind, n))
+	}
+	sort.Strings(contacts)
+	write("spotter_contacts", "Live contacts by kind.", "gauge", contacts...)
+
+	var polls, errs, msgs, reconnects, up []string
+	for _, src := range h.Sources {
+		st := src.Status()
+		label := fmt.Sprintf(`{source=%q}`, st.Name)
+		polls = append(polls, fmt.Sprintf("spotter_source_polls_total%s %d", label, st.Polls))
+		errs = append(errs, fmt.Sprintf("spotter_source_errors_total%s %d", label, st.Errors))
+		msgs = append(msgs, fmt.Sprintf("spotter_source_messages_total%s %d", label, st.Messages))
+		reconnects = append(reconnects, fmt.Sprintf("spotter_source_reconnects_total%s %d", label, st.Reconnects))
+		ok := 0
+		if st.LastSuccess != nil && (st.LastErrorAt == nil || st.LastSuccess.After(*st.LastErrorAt)) {
+			ok = 1
+		}
+		up = append(up, fmt.Sprintf("spotter_source_up%s %d", label, ok))
+	}
+	write("spotter_source_up", "1 when the source's last result was a success.", "gauge", up...)
+	write("spotter_source_polls_total", "HTTP polls made by a source.", "counter", polls...)
+	write("spotter_source_messages_total", "Stream messages received by a source.", "counter", msgs...)
+	write("spotter_source_reconnects_total", "Stream reconnects by a source.", "counter", reconnects...)
+	write("spotter_source_errors_total", "Failed polls or dropped streams by a source.", "counter", errs...)
+	write("spotter_alerts_recent", "Alerts currently in the recent list.", "gauge", fmt.Sprintf("spotter_alerts_recent %d", len(h.Alerts.Recent())))
+	w.Header().Set("Content-Type", "text/plain; version=0.0.4; charset=utf-8")
+	_, _ = w.Write([]byte(b.String()))
 }
 
 func (h *handlers) config(w http.ResponseWriter, r *http.Request) {
