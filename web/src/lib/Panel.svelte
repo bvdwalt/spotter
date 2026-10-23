@@ -1,6 +1,7 @@
 <script lang="ts">
   import { store } from "./contacts.svelte";
   import { ageText, fmtNum } from "./format";
+  import { iataFlight } from "./airlines";
 
   const c = $derived(store.selected);
 </script>
@@ -16,6 +17,7 @@
     </header>
     <dl>
       {#if c.kind === "aircraft"}
+        {#if iataFlight(c.label)}<dt>Flight</dt><dd>{iataFlight(c.label)}</dd>{/if}
         <dt>Registration</dt><dd>{c.reg ?? "–"}</dd>
         <dt>Type</dt><dd>{c.type ?? "–"}{c.category ? ` (${c.category})` : ""}</dd>
         <dt>Altitude</dt><dd>{c.on_ground ? "ground" : fmtNum(c.alt_ft, " ft")}</dd>

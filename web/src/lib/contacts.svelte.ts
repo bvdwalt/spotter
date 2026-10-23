@@ -1,4 +1,5 @@
 import { api, type ClientConfig, type Contact, type Position, type Status } from "./api";
+import { searchTerms } from "./airlines";
 
 class ContactStore {
   config = $state<ClientConfig | null>(null);
@@ -14,11 +15,12 @@ class ContactStore {
   selected = $derived(this.contacts.find((c) => c.id === this.selectedId) ?? null);
 
   visible = $derived.by(() => {
-    const q = this.query.trim().toLowerCase();
+    const terms = searchTerms(this.query);
     return this.contacts.filter((c) => {
       if (this.hideGround && c.on_ground) return false;
-      if (!q) return true;
-      return [c.label, c.reg, c.type, c.id].some((v) => v?.toLowerCase().includes(q));
+      if (terms.length === 0) return true;
+      const fields = [c.label, c.reg, c.type, c.id].map((v) => v?.toUpperCase() ?? "");
+      return terms.some((t) => fields.some((f) => f.includes(t)));
     });
   });
 
