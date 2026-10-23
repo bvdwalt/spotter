@@ -39,17 +39,6 @@ homebrew_casks:
 
 # Docker — remove this section if not publishing a Docker image
 dockers_v2:
-  - id: dockerhub
-    images:
-      - "{{ .Env.DOCKERHUB_USERNAME }}/spotter"
-    tags:
-      - "{{ .Version }}"
-      - latest
-    dockerfile: Dockerfile.goreleaser
-    platforms:
-      - linux/amd64
-      - linux/arm64
-
   - id: ghcr
     images:
       - "ghcr.io/bvdwalt/spotter"
