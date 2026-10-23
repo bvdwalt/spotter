@@ -20,6 +20,7 @@ type Config struct {
 	AISBBox          [2][2]float64 // [[latSW, lonSW], [latNE, lonNE]]
 	RouteAPIURL      string        // empty disables route lookups
 	PhotoAPIURL      string        // empty disables aircraft photos
+	BasemapPMTiles   string        // path to a PMTiles file served at /basemap.pmtiles; empty uses OpenFreeMap
 	NtfyURL          string
 	NtfyToken        string
 	WatchList        []string
@@ -33,10 +34,11 @@ type Config struct {
 func Load() (*Config, error) {
 	cfg := &Config{
 		Port:            getEnv("PORT", "8080"),
-		ADSBBaseURL:     getEnv("ADSB_BASE_URL", "https://api.adsb.lol/v2"),
+		ADSBBaseURL:     getEnv("ADSB_BASE_URL", "https://opendata.adsb.fi/api/v2"),
 		AISStreamAPIKey: os.Getenv("AISSTREAM_API_KEY"),
 		RouteAPIURL:     getEnv("ROUTE_API_URL", "https://adsb.im/api/0/routeset"),
 		PhotoAPIURL:     getEnv("PHOTO_API_URL", "https://api.planespotters.net/pub/photos/hex"),
+		BasemapPMTiles:  os.Getenv("BASEMAP_PMTILES"),
 		NtfyURL:         os.Getenv("NTFY_URL"),
 		NtfyToken:       os.Getenv("NTFY_TOKEN"),
 	}
@@ -61,7 +63,7 @@ func Load() (*Config, error) {
 		key string
 		def time.Duration
 	}{
-		{&cfg.ADSBPollInterval, "ADSB_POLL_INTERVAL", 10 * time.Second},
+		{&cfg.ADSBPollInterval, "ADSB_POLL_INTERVAL", 5 * time.Second},
 		{&cfg.AircraftExpiry, "AIRCRAFT_EXPIRY", 60 * time.Second},
 		{&cfg.VesselExpiry, "VESSEL_EXPIRY", 15 * time.Minute},
 		{&cfg.TrackWindow, "TRACK_WINDOW", 15 * time.Minute},
@@ -71,6 +73,11 @@ func Load() (*Config, error) {
 	for _, d := range durations {
 		if *d.dst, err = durationEnv(d.key, d.def); err != nil {
 			return nil, err
+		}
+	}
+	if cfg.BasemapPMTiles != "" {
+		if _, err := os.Stat(cfg.BasemapPMTiles); err != nil {
+			return nil, fmt.Errorf("BASEMAP_PMTILES: %w", err)
 		}
 	}
 	if cfg.AISBBox, err = bboxEnv("AIS_BBOX", cfg.HomeLat, cfg.HomeLon, cfg.RadiusNM); err != nil {

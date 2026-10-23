@@ -26,8 +26,8 @@ docker run -p 8080:8080 -e HOME_LAT=-26.2 -e HOME_LON=28.05 spotter
 | `PORT` | `8080` | |
 | `HOME_LAT`, `HOME_LON` | required | centre of the region |
 | `RADIUS_NM` | `150` | aircraft query radius, max 250 |
-| `ADSB_BASE_URL` | `https://api.adsb.lol/v2` | readsb-style `/point` API; `https://opendata.adsb.fi/api/v2` also works |
-| `ADSB_POLL_INTERVAL` | `10s` | adsb.lol throttles well below its stated limits; 5s draws 429s |
+| `ADSB_BASE_URL` | `https://opendata.adsb.fi/api/v2` | `https://api.adsb.lol/v2` also works, but caps at 500 requests a day |
+| `ADSB_POLL_INTERVAL` | `5s` | adsb.fi allows one request per second |
 | `AISSTREAM_API_KEY` | empty | from [aisstream.io](https://aisstream.io); ships disabled when empty |
 | `AIS_BBOX` | derived from home and radius | `latSW,lonSW,latNE,lonNE`, for example a coastal box when home is inland |
 | `AIRCRAFT_EXPIRY` | `60s` | drop aircraft not seen for this long |
@@ -68,6 +68,6 @@ title, tags, and high priority for emergencies.
 (`internal/source/adsb/testdata/point.json`) and never call the live API.
 
 Map tiles come from [OpenFreeMap](https://openfreemap.org). Aircraft data from
-[adsb.lol](https://adsb.lol) (ODbL), ship data from [AISStream](https://aisstream.io),
+[adsb.fi](https://adsb.fi) (non-commercial, attribution required), ship data from [AISStream](https://aisstream.io),
 routes from the [adsb.im](https://adsb.im) route database, aircraft photos from
 [planespotters.net](https://www.planespotters.net/photo/api).
