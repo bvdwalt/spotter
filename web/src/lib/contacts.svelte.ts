@@ -48,7 +48,8 @@ class ContactStore {
         this.contacts = list.contacts;
         this.status = status;
         this.alerts = alerts.alerts;
-        this.watch = watch.watch;
+        // A poll that started before a toggle finished would show stale watch state.
+        if (this.watchPending === 0) this.watch = watch.watch;
         this.now = Date.now();
         this.error = null;
         if (this.selectedId) {
@@ -69,14 +70,20 @@ class ContactStore {
     return this.watch.includes(id.slice(2).toLowerCase());
   }
 
+  private watchPending = 0;
+
   async toggleWatch(id: string) {
     const key = id.slice(2).toLowerCase();
-    if (this.isWatched(id)) {
-      this.watch = this.watch.filter((w) => w !== key);
-      await api.unwatch(id).catch(() => undefined);
-    } else {
-      this.watch = [...this.watch, key];
-      await api.watch(id).catch(() => undefined);
+    const wasWatched = this.isWatched(id);
+    this.watch = wasWatched ? this.watch.filter((w) => w !== key) : [...this.watch, key];
+    this.watchPending++;
+    try {
+      await (wasWatched ? api.unwatch(id) : api.watch(id));
+      this.watch = (await api.watchList()).watch;
+    } catch {
+      // keep the optimistic state; the next poll reconciles it
+    } finally {
+      this.watchPending--;
     }
   }
 

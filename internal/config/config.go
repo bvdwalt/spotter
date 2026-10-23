@@ -19,6 +19,7 @@ type Config struct {
 	AISStreamAPIKey  string
 	AISBBox          [2][2]float64 // [[latSW, lonSW], [latNE, lonNE]]
 	RouteAPIURL      string        // empty disables route lookups
+	PhotoAPIURL      string        // empty disables aircraft photos
 	NtfyURL          string
 	NtfyToken        string
 	WatchList        []string
@@ -35,6 +36,7 @@ func Load() (*Config, error) {
 		ADSBBaseURL:     getEnv("ADSB_BASE_URL", "https://api.adsb.lol/v2"),
 		AISStreamAPIKey: os.Getenv("AISSTREAM_API_KEY"),
 		RouteAPIURL:     getEnv("ROUTE_API_URL", "https://adsb.im/api/0/routeset"),
+		PhotoAPIURL:     getEnv("PHOTO_API_URL", "https://api.planespotters.net/pub/photos/hex"),
 		NtfyURL:         os.Getenv("NTFY_URL"),
 		NtfyToken:       os.Getenv("NTFY_TOKEN"),
 	}

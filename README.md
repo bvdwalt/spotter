@@ -35,6 +35,7 @@ docker run -p 8080:8080 -e HOME_LAT=-26.2 -e HOME_LON=28.05 spotter
 | `TRACK_WINDOW` | `15m` | recent positions kept per contact |
 | `TRACK_MIN_INTERVAL` | `10s` | downsample interval for tracks |
 | `ROUTE_API_URL` | `https://adsb.im/api/0/routeset` | route lookup by callsign; empty disables |
+| `PHOTO_API_URL` | `https://api.planespotters.net/pub/photos/hex` | aircraft photos; empty disables |
 | `NTFY_URL` | empty | ntfy topic URL for alerts; empty keeps alerts in the UI only |
 | `NTFY_TOKEN` | empty | bearer token for ntfy, if the topic needs one |
 | `WATCH_LIST` | empty | comma-separated ICAO hex codes and MMSIs to alert on |
@@ -47,6 +48,9 @@ docker run -p 8080:8080 -e HOME_LAT=-26.2 -e HOME_LON=28.05 spotter
 | `GET /health` | liveness, always 200 while the process runs |
 | `GET /api/contacts` | current contacts |
 | `GET /api/contacts/{id}/track` | recent positions for one contact |
+| `GET /api/contacts/{id}/photo` | first planespotters.net photo for an aircraft |
+| `PUT`/`DELETE /api/watch/{id}` | add or remove a contact from the watch list |
+| `DELETE /api/alerts` | clear recent alerts |
 | `GET /api/status` | per-source health and contact counts |
 | `GET /api/alerts` | recent alerts, newest first |
 | `GET /api/config` | home point, radius, expiry values for the UI |
@@ -65,4 +69,5 @@ title, tags, and high priority for emergencies.
 
 Map tiles come from [OpenFreeMap](https://openfreemap.org). Aircraft data from
 [adsb.lol](https://adsb.lol) (ODbL), ship data from [AISStream](https://aisstream.io),
-routes from the [adsb.im](https://adsb.im) route database.
+routes from the [adsb.im](https://adsb.im) route database, aircraft photos from
+[planespotters.net](https://www.planespotters.net/photo/api).

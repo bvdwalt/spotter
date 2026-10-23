@@ -77,6 +77,13 @@ export interface Status {
   contacts: Record<Kind, number>;
 }
 
+export interface Photo {
+  thumbnail: string;
+  large: string;
+  link: string;
+  photographer: string;
+}
+
 export interface Alert {
   rule: "emergency" | "military" | "watchlist";
   contact_id: string;
@@ -115,4 +122,5 @@ export const api = {
   track: (id: string) => getJSON<{ positions: Position[] }>(`/api/contacts/${encodeURIComponent(id)}/track`),
   status: () => getJSON<Status>("/api/status"),
   alerts: () => getJSON<{ alerts: Alert[] }>("/api/alerts"),
+  photo: (id: string) => getJSON<{ photo: Photo }>(`/api/contacts/${encodeURIComponent(id)}/photo`),
 };

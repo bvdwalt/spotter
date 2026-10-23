@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/bvdwalt/spotter/internal/model"
@@ -38,6 +39,26 @@ func (h *handlers) track(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"positions": positions})
+}
+
+// photo returns the first planespotters photo for an aircraft; vessels and unknown hexes get 404.
+func (h *handlers) photo(w http.ResponseWriter, r *http.Request) {
+	id, err := url.PathUnescape(chi.URLParam(r, "id"))
+	if err != nil || !strings.HasPrefix(id, "a:") || h.Photos == nil {
+		writeJSON(w, http.StatusNotFound, map[string]string{"error": "no photo"})
+		return
+	}
+	p, err := h.Photos.Lookup(r.Context(), strings.TrimPrefix(id, "a:"))
+	if err != nil {
+		writeJSON(w, http.StatusBadGateway, map[string]string{"error": err.Error()})
+		return
+	}
+	if p == nil {
+		writeJSON(w, http.StatusNotFound, map[string]string{"error": "no photo"})
+		return
+	}
+	w.Header().Set("Cache-Control", "public, max-age=3600")
+	writeJSON(w, http.StatusOK, map[string]any{"photo": p})
 }
 
 func (h *handlers) status(w http.ResponseWriter, r *http.Request) {

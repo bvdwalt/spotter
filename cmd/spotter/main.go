@@ -13,6 +13,7 @@ import (
 	"github.com/bvdwalt/spotter/internal/alert"
 	"github.com/bvdwalt/spotter/internal/config"
 	"github.com/bvdwalt/spotter/internal/model"
+	"github.com/bvdwalt/spotter/internal/photo"
 	"github.com/bvdwalt/spotter/internal/route"
 	"github.com/bvdwalt/spotter/internal/server"
 	"github.com/bvdwalt/spotter/internal/source/adsb"
@@ -83,11 +84,17 @@ func run(ctx context.Context, cfg *config.Config) error {
 		go resolveRoutes(ctx, route.New(cfg.RouteAPIURL), store)
 	}
 
+	var photos *photo.Client
+	if cfg.PhotoAPIURL != "" {
+		photos = photo.New(cfg.PhotoAPIURL, version)
+	}
+
 	srv := &http.Server{
 		Addr: ":" + cfg.Port,
 		Handler: server.New(server.Deps{
 			Store:   store,
 			Alerts:  alerts,
+			Photos:  photos,
 			Sources: sources,
 			Version: version,
 			Config: server.ClientConfig{

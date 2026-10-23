@@ -108,3 +108,9 @@ func TestWatchEndpoints(t *testing.T) {
 		t.Fatalf("after unwatch: %v", body)
 	}
 }
+
+func TestPhotoDisabled(t *testing.T) {
+	if code, _ := get(t, newTestServer(), "/api/contacts/a:1/photo"); code != 404 {
+		t.Errorf("photo without client: %d", code)
+	}
+}

@@ -8,6 +8,7 @@ import (
 
 	"github.com/bvdwalt/spotter/internal/alert"
 	"github.com/bvdwalt/spotter/internal/model"
+	"github.com/bvdwalt/spotter/internal/photo"
 	"github.com/bvdwalt/spotter/internal/track"
 	"github.com/bvdwalt/spotter/web"
 	"github.com/go-chi/chi/v5"
@@ -27,6 +28,7 @@ type ClientConfig struct {
 type Deps struct {
 	Store   *track.Store
 	Alerts  *alert.Engine
+	Photos  *photo.Client // nil disables /photo
 	Sources []model.StatusReporter
 	Config  ClientConfig
 	Version string
@@ -43,6 +45,7 @@ func New(d Deps) http.Handler {
 		r.Use(middleware.NoCache)
 		r.Get("/contacts", h.contacts)
 		r.Get("/contacts/{id}/track", h.track)
+		r.Get("/contacts/{id}/photo", h.photo)
 		r.Get("/status", h.status)
 		r.Get("/alerts", h.alerts)
 		r.Delete("/alerts", h.clearAlerts)

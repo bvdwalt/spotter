@@ -1,10 +1,26 @@
 <script lang="ts">
   import { store } from "./contacts.svelte";
+  import { api, type Photo } from "./api";
   import { ageText, clockText, dateTimeText, durationText, fmtNum, navStatusText } from "./format";
   import { iataFlight, operator } from "./airlines";
   import { haversineKm } from "./geo";
 
   const c = $derived(store.selected);
+
+  let photo = $state<Photo | null>(null);
+  $effect(() => {
+    const id = store.selectedId;
+    photo = null;
+    if (!id || !id.startsWith("a:")) return;
+    let live = true;
+    api
+      .photo(id)
+      .then((r) => live && (photo = r.photo))
+      .catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  });
 
   /** Aircraft only: distance left along the route and the time it takes at the current ground speed. */
   const progress = $derived.by(() => {
@@ -31,6 +47,12 @@
         <button class="close" onclick={() => store.select(null)} aria-label="Close">×</button>
       </div>
     </header>
+    {#if photo}
+      <a class="photo" href={photo.link} target="_blank" rel="noopener">
+        <img src={photo.large} alt="{c.label} photo" loading="lazy" />
+        <span class="credit">© {photo.photographer} · planespotters.net</span>
+      </a>
+    {/if}
     <dl>
       {#if c.kind === "aircraft"}
         {#if iataFlight(c.label)}<dt>Flight</dt><dd>{iataFlight(c.label)}</dd>{/if}
@@ -134,6 +156,29 @@
     font-size: 1.4rem;
     cursor: pointer;
     line-height: 1;
+  }
+  .photo {
+    display: block;
+    position: relative;
+    margin: 0.25rem 0 0.6rem;
+    border-radius: 4px;
+    overflow: hidden;
+    background: #111;
+  }
+  .photo img {
+    display: block;
+    width: 100%;
+    max-height: 220px;
+    object-fit: cover;
+  }
+  .credit {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    padding: 0.1rem 0.4rem;
+    font-size: 0.65rem;
+    color: #ddd;
+    background: rgba(0, 0, 0, 0.55);
   }
   dl {
     display: grid;
