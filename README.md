@@ -1,6 +1,6 @@
 # spotter
 
-Lightweight live map of aircraft (and later ships) within a fixed radius of home.
+Lightweight live map of aircraft and ships within a fixed radius of home.
 One Go binary with the Svelte frontend embedded, no database, no external services
 beyond the ADS-B aggregator and the browser's map tiles.
 
@@ -28,7 +28,8 @@ docker run -p 8080:8080 -e HOME_LAT=-26.2 -e HOME_LON=28.05 spotter
 | `RADIUS_NM` | `150` | aircraft query radius, max 250 |
 | `ADSB_BASE_URL` | `https://api.adsb.lol/v2` | any readsb-style `/point/{lat}/{lon}/{nm}` API |
 | `ADSB_POLL_INTERVAL` | `5s` | |
-| `AISSTREAM_API_KEY` | empty | ships disabled when empty (not yet implemented) |
+| `AISSTREAM_API_KEY` | empty | from [aisstream.io](https://aisstream.io); ships disabled when empty |
+| `AIS_BBOX` | derived from home and radius | `latSW,lonSW,latNE,lonNE`, for example a coastal box when home is inland |
 | `AIRCRAFT_EXPIRY` | `60s` | drop aircraft not seen for this long |
 | `VESSEL_EXPIRY` | `15m` | |
 | `TRACK_WINDOW` | `15m` | recent positions kept per contact |
@@ -50,4 +51,4 @@ docker run -p 8080:8080 -e HOME_LAT=-26.2 -e HOME_LON=28.05 spotter
 (`internal/source/adsb/testdata/point.json`) and never call the live API.
 
 Map tiles come from [OpenFreeMap](https://openfreemap.org). Aircraft data from
-[adsb.lol](https://adsb.lol) (ODbL).
+[adsb.lol](https://adsb.lol) (ODbL), ship data from [AISStream](https://aisstream.io).

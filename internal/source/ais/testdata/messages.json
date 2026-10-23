@@ -1,0 +1,180 @@
+[
+ {
+  "MetaData": {
+   "MMSI": 249391000,
+   "MMSI_String": 249391000,
+   "ShipName": "LEDA C",
+   "latitude": -29.74124,
+   "longitude": 31.14841,
+   "time_utc": "2026-10-23 20:13:17.34815656 +0000 UTC"
+  },
+  "MessageType": "PositionReport",
+  "Message": {
+   "PositionReport": {
+    "MessageID": 3,
+    "RepeatIndicator": 0,
+    "UserID": 249391000,
+    "Valid": true,
+    "NavigationalStatus": 1,
+    "RateOfTurn": 0,
+    "Sog": 0,
+    "PositionAccuracy": false,
+    "Longitude": 31.148410000000002,
+    "Latitude": -29.74123666666667,
+    "Cog": 269.7,
+    "TrueHeading": 163,
+    "Timestamp": 13,
+    "SpecialManoeuvreIndicator": 0,
+    "Spare": 0,
+    "Raim": false,
+    "CommunicationState": 216138
+   }
+  }
+ },
+ {
+  "MetaData": {
+   "MMSI": 224721000,
+   "MMSI_String": 224721000,
+   "ShipName": "IBSA QUINTO ",
+   "latitude": -29.86835,
+   "longitude": 31.01311,
+   "time_utc": "2026-10-23 20:13:21.235729115 +0000 UTC"
+  },
+  "MessageType": "PositionReport",
+  "Message": {
+   "PositionReport": {
+    "MessageID": 1,
+    "RepeatIndicator": 0,
+    "UserID": 224721000,
+    "Valid": true,
+    "NavigationalStatus": 15,
+    "RateOfTurn": 0,
+    "Sog": 0.1,
+    "PositionAccuracy": false,
+    "Longitude": 31.013109999999998,
+    "Latitude": -29.868353333333335,
+    "Cog": 360,
+    "TrueHeading": 225,
+    "Timestamp": 21,
+    "SpecialManoeuvreIndicator": 0,
+    "Spare": 0,
+    "Raim": false,
+    "CommunicationState": 33557
+   }
+  }
+ },
+ {
+  "MetaData": {
+   "MMSI": 355137000,
+   "MMSI_String": 355137000,
+   "ShipName": "SILVER RAY          ",
+   "latitude": -29.78161,
+   "longitude": 31.3311,
+   "time_utc": "2026-10-23 20:13:23.940125818 +0000 UTC"
+  },
+  "MessageType": "PositionReport",
+  "Message": {
+   "PositionReport": {
+    "MessageID": 1,
+    "RepeatIndicator": 0,
+    "UserID": 355137000,
+    "Valid": true,
+    "NavigationalStatus": 0,
+    "RateOfTurn": 0,
+    "Sog": 1.5,
+    "PositionAccuracy": false,
+    "Longitude": 31.331101666666665,
+    "Latitude": -29.781611666666667,
+    "Cog": 334,
+    "TrueHeading": 148,
+    "Timestamp": 23,
+    "SpecialManoeuvreIndicator": 0,
+    "Spare": 0,
+    "Raim": false,
+    "CommunicationState": 66417
+   }
+  }
+ },
+ {
+  "MetaData": {
+   "MMSI": 414604000,
+   "MMSI_String": 414604000,
+   "ShipName": "ZHONG XIN YUAN YANG ",
+   "latitude": -29.66535,
+   "longitude": 31.18589,
+   "time_utc": "2026-10-23 20:13:34.405546691 +0000 UTC"
+  },
+  "MessageType": "ShipStaticData",
+  "Message": {
+   "ShipStaticData": {
+    "AisVersion": 1,
+    "CallSign": "BOXJ3  ",
+    "Destination": "ZA DUR              ",
+    "Dimension": {
+     "A": 197,
+     "B": 32,
+     "C": 14,
+     "D": 24
+    },
+    "Dte": false,
+    "Eta": {
+     "Day": 22,
+     "Hour": 16,
+     "Minute": 30,
+     "Month": 10
+    },
+    "FixType": 1,
+    "ImoNumber": 9457842,
+    "MaximumStaticDraught": 9.3,
+    "MessageID": 5,
+    "Name": "ZHONG XIN YUAN YANG ",
+    "RepeatIndicator": 0,
+    "Spare": false,
+    "Type": 79,
+    "UserID": 414604000,
+    "Valid": true
+   }
+  }
+ },
+ {
+  "MetaData": {
+   "MMSI": 538012306,
+   "MMSI_String": 538012306,
+   "ShipName": "T MOUNT FUJI        ",
+   "latitude": -29.88781,
+   "longitude": 31.03488,
+   "time_utc": "2026-10-23 20:14:01.603266757 +0000 UTC"
+  },
+  "MessageType": "ShipStaticData",
+  "Message": {
+   "ShipStaticData": {
+    "AisVersion": 2,
+    "CallSign": "V7B2651",
+    "Destination": "ZA DUR              ",
+    "Dimension": {
+     "A": 158,
+     "B": 27,
+     "C": 11,
+     "D": 21
+    },
+    "Dte": false,
+    "Eta": {
+     "Day": 21,
+     "Hour": 19,
+     "Minute": 30,
+     "Month": 10
+    },
+    "FixType": 1,
+    "ImoNumber": 1047081,
+    "MaximumStaticDraught": 12.2,
+    "MessageID": 5,
+    "Name": "T MOUNT FUJI        ",
+    "RepeatIndicator": 0,
+    "Spare": false,
+    "Type": 80,
+    "UserID": 538012306,
+    "Valid": true
+   }
+  }
+ }
+]

@@ -8,7 +8,7 @@
   let sortAsc = $state(true);
 
   const columns: { key: Key; title: string }[] = [
-    { key: "label", title: "Callsign" },
+    { key: "label", title: "Name" },
     { key: "type", title: "Type" },
     { key: "alt_ft", title: "Alt ft" },
     { key: "speed_kt", title: "Kt" },
@@ -51,9 +51,9 @@
   <tbody>
     {#each rows as c (c.id)}
       <tr class:selected={c.id === store.selectedId} class:military={c.military} class:emergency={!!c.emergency} onclick={() => store.select(c.id)}>
-        <td>{c.label}</td>
+        <td>{c.kind === "vessel" ? "⛴ " : ""}{c.label}</td>
         <td>{c.type ?? ""}</td>
-        <td class="num">{c.on_ground ? "gnd" : fmtNum(c.alt_ft)}</td>
+        <td class="num">{c.kind === "vessel" ? "" : c.on_ground ? "gnd" : fmtNum(c.alt_ft)}</td>
         <td class="num">{fmtNum(c.speed_kt)}</td>
         <td class="num">{fmtNum(c.heading_deg)}</td>
         <td class="num">{c.distance_km.toFixed(0)}</td>

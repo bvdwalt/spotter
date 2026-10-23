@@ -1,4 +1,4 @@
-import { api, type ClientConfig, type Contact, type Position, type Status } from "./api";
+import { api, type ClientConfig, type Contact, type Kind, type Position, type Status } from "./api";
 import { searchTerms } from "./airlines";
 
 class ContactStore {
@@ -8,6 +8,7 @@ class ContactStore {
   selectedId = $state<string | null>(null);
   track = $state<Position[]>([]);
   hideGround = $state(true);
+  kind = $state<"all" | Kind>("all");
   query = $state("");
   error = $state<string | null>(null);
   now = $state(Date.now());
@@ -17,6 +18,7 @@ class ContactStore {
   visible = $derived.by(() => {
     const terms = searchTerms(this.query);
     return this.contacts.filter((c) => {
+      if (this.kind !== "all" && c.kind !== this.kind) return false;
       if (this.hideGround && c.on_ground) return false;
       if (terms.length === 0) return true;
       const fields = [c.label, c.reg, c.type, c.id].map((v) => v?.toUpperCase() ?? "");

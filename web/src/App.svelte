@@ -4,13 +4,16 @@
   import Table from "./lib/Table.svelte";
   import { store } from "./lib/contacts.svelte";
   import { ageText } from "./lib/format";
+  import type { SourceStatus } from "./lib/api";
 
   $effect(() => {
     store.start();
   });
 
-  const source = $derived(store.status?.sources[0]);
-  const sourceOk = $derived(!!source?.last_success && !(source.last_error_at && source.last_success && source.last_error_at > source.last_success));
+  const sources = $derived(store.status?.sources ?? []);
+  const sourceOk = (s: SourceStatus) =>
+    !!s.last_success && !(s.last_error_at && s.last_success && s.last_error_at > s.last_success);
+  const anyBad = $derived(sources.some((s) => !sourceOk(s)));
 </script>
 
 <div class="layout">
@@ -22,16 +25,23 @@
       <strong>spotter</strong>
       <span class="count">{store.visible.length} / {store.contacts.length}</span>
       <input type="search" placeholder="Search callsign, reg, type" bind:value={store.query} />
+      <select bind:value={store.kind}>
+        <option value="all">all</option>
+        <option value="aircraft">aircraft</option>
+        <option value="vessel">vessels</option>
+      </select>
       <label><input type="checkbox" bind:checked={store.hideGround} /> hide ground</label>
     </div>
-    <div class="status" class:bad={!sourceOk || !!store.error}>
+    <div class="status" class:bad={anyBad || !!store.error}>
       {#if store.error}
         backend: {store.error}
-      {:else if source}
-        {source.name}: {sourceOk ? "ok" : (source.last_error ?? "waiting")}
-        {#if source.last_success}· polled {ageText(source.last_success, store.now)}{/if}
-      {:else}
+      {:else if sources.length === 0}
         connecting…
+      {:else}
+        {#each sources as s, i}
+          {i > 0 ? " · " : ""}{s.name}: {sourceOk(s) ? "ok" : (s.last_error ?? "waiting")}
+          {#if s.last_success}({ageText(s.last_success, store.now)}){/if}
+        {/each}
       {/if}
     </div>
     <Panel />
@@ -72,6 +82,13 @@
   input[type="search"] {
     flex: 1 1 100%;
     padding: 0.35rem 0.5rem;
+    background: #121212;
+    border: 1px solid #333;
+    border-radius: 4px;
+    color: inherit;
+  }
+  select {
+    padding: 0.25rem 0.4rem;
     background: #121212;
     border: 1px solid #333;
     border-radius: 4px;

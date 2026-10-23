@@ -1,6 +1,6 @@
 <script lang="ts">
   import { store } from "./contacts.svelte";
-  import { ageText, fmtNum } from "./format";
+  import { ageText, fmtNum, navStatusText } from "./format";
   import { iataFlight } from "./airlines";
 
   const c = $derived(store.selected);
@@ -27,7 +27,7 @@
         <dt>MMSI</dt><dd>{c.id.slice(2)}</dd>
         <dt>Type</dt><dd>{c.type ?? "–"}</dd>
         <dt>Destination</dt><dd>{c.destination ?? "–"}</dd>
-        <dt>Nav status</dt><dd>{c.nav_status ?? "–"}</dd>
+        <dt>Status</dt><dd>{navStatusText(c.nav_status)}</dd>
       {/if}
       <dt>Speed</dt><dd>{fmtNum(c.speed_kt, " kt", 0)}</dd>
       <dt>Heading</dt><dd>{fmtNum(c.heading_deg, "°", 0)}</dd>

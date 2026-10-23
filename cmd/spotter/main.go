@@ -14,6 +14,7 @@ import (
 	"github.com/bvdwalt/spotter/internal/model"
 	"github.com/bvdwalt/spotter/internal/server"
 	"github.com/bvdwalt/spotter/internal/source/adsb"
+	"github.com/bvdwalt/spotter/internal/source/ais"
 	"github.com/bvdwalt/spotter/internal/track"
 )
 
@@ -27,9 +28,7 @@ func run(ctx context.Context, cfg *config.Config) error {
 	})
 
 	adsbSource := adsb.New(cfg.ADSBBaseURL, cfg.HomeLat, cfg.HomeLon, cfg.RadiusNM, cfg.ADSBPollInterval)
-	if cfg.AISStreamAPIKey == "" {
-		slog.Info("AISSTREAM_API_KEY not set, ships disabled")
-	}
+	sources := []model.StatusReporter{adsbSource}
 
 	updates := make(chan model.Contact, 256)
 	go func() {
@@ -37,6 +36,18 @@ func run(ctx context.Context, cfg *config.Config) error {
 			slog.Error("adsb source stopped", "err", err)
 		}
 	}()
+	if cfg.AISStreamAPIKey == "" {
+		slog.Info("AISSTREAM_API_KEY not set, ships disabled")
+	} else {
+		aisSource := ais.New(cfg.AISStreamAPIKey, cfg.AISBBox)
+		sources = append(sources, aisSource)
+		slog.Info("ais enabled", "bbox", cfg.AISBBox)
+		go func() {
+			if err := aisSource.Run(ctx, updates); err != nil {
+				slog.Error("ais source stopped", "err", err)
+			}
+		}()
+	}
 	go func() {
 		sweep := time.NewTicker(5 * time.Second)
 		defer sweep.Stop()
@@ -56,7 +67,7 @@ func run(ctx context.Context, cfg *config.Config) error {
 		Addr: ":" + cfg.Port,
 		Handler: server.New(server.Deps{
 			Store:   store,
-			Sources: []model.StatusReporter{adsbSource},
+			Sources: sources,
 			Version: version,
 			Config: server.ClientConfig{
 				HomeLat: cfg.HomeLat, HomeLon: cfg.HomeLon, RadiusNM: cfg.RadiusNM,

@@ -2,8 +2,10 @@ package config
 
 import (
 	"fmt"
+	"math"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -15,6 +17,7 @@ type Config struct {
 	ADSBBaseURL      string
 	ADSBPollInterval time.Duration
 	AISStreamAPIKey  string
+	AISBBox          [2][2]float64 // [[latSW, lonSW], [latNE, lonNE]]
 	AircraftExpiry   time.Duration
 	VesselExpiry     time.Duration
 	TrackWindow      time.Duration
@@ -56,7 +59,37 @@ func Load() (*Config, error) {
 			return nil, err
 		}
 	}
+	if cfg.AISBBox, err = bboxEnv("AIS_BBOX", cfg.HomeLat, cfg.HomeLon, cfg.RadiusNM); err != nil {
+		return nil, err
+	}
 	return cfg, nil
+}
+
+// bboxEnv parses "latSW,lonSW,latNE,lonNE" or derives a box spanning the radius around home.
+func bboxEnv(key string, lat, lon, radiusNM float64) ([2][2]float64, error) {
+	var box [2][2]float64
+	v := os.Getenv(key)
+	if v == "" {
+		dLat := radiusNM / 60
+		dLon := dLat / math.Max(math.Cos(lat*math.Pi/180), 0.01)
+		return [2][2]float64{{lat - dLat, lon - dLon}, {lat + dLat, lon + dLon}}, nil
+	}
+	parts := strings.Split(v, ",")
+	if len(parts) != 4 {
+		return box, fmt.Errorf("%s must be latSW,lonSW,latNE,lonNE", key)
+	}
+	var vals [4]float64
+	for i, p := range parts {
+		f, err := strconv.ParseFloat(strings.TrimSpace(p), 64)
+		if err != nil {
+			return box, fmt.Errorf("%s: %w", key, err)
+		}
+		vals[i] = f
+	}
+	if vals[0] >= vals[2] || vals[1] >= vals[3] {
+		return box, fmt.Errorf("%s: south-west corner must be below and left of north-east", key)
+	}
+	return [2][2]float64{{vals[0], vals[1]}, {vals[2], vals[3]}}, nil
 }
 
 func getEnv(key, fallback string) string {

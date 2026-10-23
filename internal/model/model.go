@@ -52,9 +52,11 @@ type SourceStatus struct {
 	LastSuccess *time.Time `json:"last_success,omitempty"`
 	LastError   string     `json:"last_error,omitempty"`
 	LastErrorAt *time.Time `json:"last_error_at,omitempty"`
-	Polls       int64      `json:"polls"`
+	Polls       int64      `json:"polls,omitempty"`
+	Messages    int64      `json:"messages,omitempty"`
+	Reconnects  int64      `json:"reconnects,omitempty"`
 	Errors      int64      `json:"errors"`
-	LastCount   int        `json:"last_count"`
+	LastCount   int        `json:"last_count,omitempty"`
 }
 
 type StatusReporter interface {
