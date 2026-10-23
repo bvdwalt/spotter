@@ -122,3 +122,14 @@ func TestRetryAfterBounds(t *testing.T) {
 		t.Errorf("huge value should clamp to max: %v", got)
 	}
 }
+
+func TestPointURLShapes(t *testing.T) {
+	lol := New("https://api.adsb.lol/v2", -33.93, 18.45, 150, time.Second)
+	if got := lol.pointURL(); got != "https://api.adsb.lol/v2/point/-33.9300/18.4500/150" {
+		t.Errorf("adsb.lol url = %s", got)
+	}
+	fi := New("https://opendata.adsb.fi/api/v2", -33.93, 18.45, 150, time.Second)
+	if got := fi.pointURL(); got != "https://opendata.adsb.fi/api/v2/lat/-33.9300/lon/18.4500/dist/150" {
+		t.Errorf("adsb.fi url = %s", got)
+	}
+}

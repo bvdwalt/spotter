@@ -103,7 +103,7 @@ func (s *Source) Run(ctx context.Context, out chan<- model.Contact) error {
 }
 
 func (s *Source) Poll(ctx context.Context) ([]model.Contact, error) {
-	u := fmt.Sprintf("%s/point/%s/%s/%d", s.BaseURL, fmtCoord(s.Lat), fmtCoord(s.Lon), int(math.Round(s.RadiusNM)))
+	u := s.pointURL()
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
 	if err != nil {
 		return nil, err
@@ -131,6 +131,15 @@ func retryAfter(h http.Header, fallback time.Duration) time.Duration {
 		}
 	}
 	return fallback
+}
+
+// pointURL builds the point query. adsb.fi uses a different path from the readsb-style aggregators.
+func (s *Source) pointURL() string {
+	radius := int(math.Round(s.RadiusNM))
+	if strings.Contains(s.BaseURL, "adsb.fi") {
+		return fmt.Sprintf("%s/lat/%s/lon/%s/dist/%d", s.BaseURL, fmtCoord(s.Lat), fmtCoord(s.Lon), radius)
+	}
+	return fmt.Sprintf("%s/point/%s/%s/%d", s.BaseURL, fmtCoord(s.Lat), fmtCoord(s.Lon), radius)
 }
 
 func fmtCoord(f float64) string { return fmt.Sprintf("%.4f", f) }

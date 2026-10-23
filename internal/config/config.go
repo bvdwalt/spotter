@@ -59,7 +59,7 @@ func Load() (*Config, error) {
 		key string
 		def time.Duration
 	}{
-		{&cfg.ADSBPollInterval, "ADSB_POLL_INTERVAL", 5 * time.Second},
+		{&cfg.ADSBPollInterval, "ADSB_POLL_INTERVAL", 10 * time.Second},
 		{&cfg.AircraftExpiry, "AIRCRAFT_EXPIRY", 60 * time.Second},
 		{&cfg.VesselExpiry, "VESSEL_EXPIRY", 15 * time.Minute},
 		{&cfg.TrackWindow, "TRACK_WINDOW", 15 * time.Minute},

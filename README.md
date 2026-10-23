@@ -26,8 +26,8 @@ docker run -p 8080:8080 -e HOME_LAT=-26.2 -e HOME_LON=28.05 spotter
 | `PORT` | `8080` | |
 | `HOME_LAT`, `HOME_LON` | required | centre of the region |
 | `RADIUS_NM` | `150` | aircraft query radius, max 250 |
-| `ADSB_BASE_URL` | `https://api.adsb.lol/v2` | any readsb-style `/point/{lat}/{lon}/{nm}` API |
-| `ADSB_POLL_INTERVAL` | `5s` | |
+| `ADSB_BASE_URL` | `https://api.adsb.lol/v2` | readsb-style `/point` API; `https://opendata.adsb.fi/api/v2` also works |
+| `ADSB_POLL_INTERVAL` | `10s` | adsb.lol throttles well below its stated limits; 5s draws 429s |
 | `AISSTREAM_API_KEY` | empty | from [aisstream.io](https://aisstream.io); ships disabled when empty |
 | `AIS_BBOX` | derived from home and radius | `latSW,lonSW,latNE,lonNE`, for example a coastal box when home is inland |
 | `AIRCRAFT_EXPIRY` | `60s` | drop aircraft not seen for this long |
