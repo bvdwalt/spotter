@@ -61,3 +61,21 @@ func TestDistanceAndStaticCarryOver(t *testing.T) {
 		t.Errorf("distance = %v", c.DistanceKm)
 	}
 }
+
+func TestRouteSurvivesUpdates(t *testing.T) {
+	s := newTestStore()
+	s.Upsert(model.Contact{ID: "a:1", Kind: model.KindAircraft, Label: "SFR806", Seen: time.Now()})
+	if len(s.Unrouted()) != 1 {
+		t.Fatal("expected one unrouted aircraft")
+	}
+	s.SetRoute("a:1", &model.Route{From: model.Airport{IATA: "JNB"}, To: model.Airport{IATA: "CPT"}, Plausible: true})
+	s.Upsert(model.Contact{ID: "a:1", Kind: model.KindAircraft, Label: "SFR806", Seen: time.Now()})
+	c := s.Snapshot()[0]
+	if c.Route == nil || c.Route.To.IATA != "CPT" {
+		t.Errorf("route lost on update: %+v", c.Route)
+	}
+	if len(s.Unrouted()) != 0 {
+		t.Error("routed aircraft should not be listed as unrouted")
+	}
+	s.SetRoute("a:missing", nil) // no panic on unknown id
+}

@@ -1,5 +1,19 @@
 export type Kind = "aircraft" | "vessel";
 
+export interface Airport {
+  iata: string;
+  icao: string;
+  name: string;
+  lat: number;
+  lon: number;
+}
+
+export interface Route {
+  from: Airport;
+  to: Airport;
+  plausible: boolean;
+}
+
 export interface Contact {
   id: string;
   kind: Kind;
@@ -19,6 +33,7 @@ export interface Contact {
   nav_status?: number;
   destination?: string;
   military: boolean;
+  route?: Route;
   source: string;
   seen: string;
   distance_km: number;

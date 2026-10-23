@@ -18,6 +18,13 @@
     <dl>
       {#if c.kind === "aircraft"}
         {#if iataFlight(c.label)}<dt>Flight</dt><dd>{iataFlight(c.label)}</dd>{/if}
+        {#if c.route}
+          <dt>Route</dt>
+          <dd class:dim={!c.route.plausible} title={c.route.plausible ? "" : "position does not fit this route"}>
+            {c.route.from.iata || c.route.from.icao} → {c.route.to.iata || c.route.to.icao}
+            <span class="sub">{c.route.from.name} → {c.route.to.name}</span>
+          </dd>
+        {/if}
         <dt>Registration</dt><dd>{c.reg ?? "–"}</dd>
         <dt>Type</dt><dd>{c.type ?? "–"}{c.category ? ` (${c.category})` : ""}</dd>
         <dt>Altitude</dt><dd>{c.on_ground ? "ground" : fmtNum(c.alt_ft, " ft")}</dd>
@@ -74,6 +81,12 @@
   }
   dt {
     color: #9a9a9a;
+  }
+  .dim {
+    color: #9a9a9a;
+  }
+  dd .sub {
+    display: block;
   }
   .alert {
     color: #ff9f43;

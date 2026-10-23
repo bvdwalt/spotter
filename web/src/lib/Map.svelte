@@ -4,6 +4,7 @@
   import type { Contact } from "./api";
   import { ICONS, loadIcon } from "./icons";
   import { store } from "./contacts.svelte";
+  import { greatCircle } from "./geo";
 
   const STYLE = "https://tiles.openfreemap.org/styles/positron";
   let container: HTMLDivElement;
@@ -49,6 +50,32 @@
     };
   }
 
+  function routeGeoJSON(): GeoJSON.FeatureCollection {
+    const sel = store.selected;
+    const r = sel?.route;
+    if (!sel || !r || !r.plausible) return { type: "FeatureCollection", features: [] };
+    const here: [number, number] = [sel.lon, sel.lat];
+    const line = (coords: [number, number][]) => ({
+      type: "Feature" as const,
+      geometry: { type: "LineString" as const, coordinates: coords },
+      properties: {},
+    });
+    const point = (a: { lon: number; lat: number; iata: string; icao: string }) => ({
+      type: "Feature" as const,
+      geometry: { type: "Point" as const, coordinates: [a.lon, a.lat] },
+      properties: { code: a.iata || a.icao },
+    });
+    return {
+      type: "FeatureCollection",
+      features: [
+        line(greatCircle([r.from.lon, r.from.lat], here)),
+        line(greatCircle(here, [r.to.lon, r.to.lat])),
+        point(r.from),
+        point(r.to),
+      ],
+    };
+  }
+
   $effect(() => {
     const cfg = store.config;
     if (!cfg || map) return;
@@ -77,6 +104,27 @@
         type: "circle",
         source: "home",
         paint: { "circle-radius": 5, "circle-color": "#4ecdc4", "circle-stroke-color": "#111", "circle-stroke-width": 1.5 },
+      });
+      m.addSource("route", { type: "geojson", data: routeGeoJSON() });
+      m.addLayer({
+        id: "route",
+        type: "line",
+        source: "route",
+        filter: ["==", ["geometry-type"], "LineString"],
+        paint: { "line-color": "#6c5ce7", "line-width": 1.5, "line-dasharray": [2, 3], "line-opacity": 0.8 },
+      });
+      m.addLayer({
+        id: "route-airports",
+        type: "symbol",
+        source: "route",
+        filter: ["==", ["geometry-type"], "Point"],
+        layout: {
+          "text-field": ["get", "code"],
+          "text-size": 11,
+          "text-font": ["Noto Sans Regular"],
+          "text-offset": [0, -1],
+        },
+        paint: { "text-color": "#6c5ce7", "text-halo-color": "#fff", "text-halo-width": 1.2 },
       });
       m.addSource("track", { type: "geojson", data: trackGeoJSON() });
       m.addLayer({
@@ -135,6 +183,11 @@
   $effect(() => {
     if (!ready || !map) return;
     (map.getSource("track") as GeoJSONSource | undefined)?.setData(trackGeoJSON());
+  });
+
+  $effect(() => {
+    if (!ready || !map) return;
+    (map.getSource("route") as GeoJSONSource | undefined)?.setData(routeGeoJSON());
   });
 </script>
 

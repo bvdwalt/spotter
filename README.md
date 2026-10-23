@@ -34,6 +34,7 @@ docker run -p 8080:8080 -e HOME_LAT=-26.2 -e HOME_LON=28.05 spotter
 | `VESSEL_EXPIRY` | `15m` | |
 | `TRACK_WINDOW` | `15m` | recent positions kept per contact |
 | `TRACK_MIN_INTERVAL` | `10s` | downsample interval for tracks |
+| `ROUTE_API_URL` | `https://adsb.im/api/0/routeset` | route lookup by callsign; empty disables |
 | `NTFY_URL` | empty | ntfy topic URL for alerts; empty keeps alerts in the UI only |
 | `NTFY_TOKEN` | empty | bearer token for ntfy, if the topic needs one |
 | `WATCH_LIST` | empty | comma-separated ICAO hex codes and MMSIs to alert on |
@@ -63,4 +64,5 @@ title, tags, and high priority for emergencies.
 (`internal/source/adsb/testdata/point.json`) and never call the live API.
 
 Map tiles come from [OpenFreeMap](https://openfreemap.org). Aircraft data from
-[adsb.lol](https://adsb.lol) (ODbL), ship data from [AISStream](https://aisstream.io).
+[adsb.lol](https://adsb.lol) (ODbL), ship data from [AISStream](https://aisstream.io),
+routes from the [adsb.im](https://adsb.im) route database.

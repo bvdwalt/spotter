@@ -1,0 +1,106 @@
+[
+  {
+    "_airport_codes_iata": "unknown",
+    "_airports": [],
+    "airline_code": "unknown",
+    "airport_codes": "unknown",
+    "callsign": "LNK351Q",
+    "number": "unknown"
+  },
+  {
+    "_airport_codes_iata": "JNB-CPT",
+    "_airports": [
+      {
+        "alt_feet": 5558.0,
+        "alt_meters": 1694.08,
+        "countryiso2": "ZA",
+        "iata": "JNB",
+        "icao": "FAOR",
+        "lat": -26.1392,
+        "location": "Johannesburg",
+        "lon": 28.246,
+        "name": "OR Tambo International Airport"
+      },
+      {
+        "alt_feet": 151.0,
+        "alt_meters": 46.02,
+        "countryiso2": "ZA",
+        "iata": "CPT",
+        "icao": "FACT",
+        "lat": -33.964802,
+        "location": "Cape Town",
+        "lon": 18.6017,
+        "name": "Cape Town International Airport"
+      }
+    ],
+    "airline_code": "SFR",
+    "airport_codes": "FAOR-FACT",
+    "callsign": "SFR806",
+    "number": "806",
+    "plausible": true
+  },
+  {
+    "_airport_codes_iata": "DUR-CPT",
+    "_airports": [
+      {
+        "alt_feet": 295.0,
+        "alt_meters": 89.92,
+        "countryiso2": "ZA",
+        "iata": "DUR",
+        "icao": "FALE",
+        "lat": -29.614444,
+        "location": "Durban",
+        "lon": 31.119722,
+        "name": "King Shaka International Airport"
+      },
+      {
+        "alt_feet": 151.0,
+        "alt_meters": 46.02,
+        "countryiso2": "ZA",
+        "iata": "CPT",
+        "icao": "FACT",
+        "lat": -33.964802,
+        "location": "Cape Town",
+        "lon": 18.6017,
+        "name": "Cape Town International Airport"
+      }
+    ],
+    "airline_code": "SFR",
+    "airport_codes": "FALE-FACT",
+    "callsign": "SFR185",
+    "number": "185",
+    "plausible": true
+  },
+  {
+    "_airport_codes_iata": "LGW-CPT",
+    "_airports": [
+      {
+        "alt_feet": 202.0,
+        "alt_meters": 61.57,
+        "countryiso2": "GB",
+        "iata": "LGW",
+        "icao": "EGKK",
+        "lat": 51.148102,
+        "location": "London",
+        "lon": -0.190278,
+        "name": "London Gatwick Airport"
+      },
+      {
+        "alt_feet": 151.0,
+        "alt_meters": 46.02,
+        "countryiso2": "ZA",
+        "iata": "CPT",
+        "icao": "FACT",
+        "lat": -33.964802,
+        "location": "Cape Town",
+        "lon": 18.6017,
+        "name": "Cape Town International Airport"
+      }
+    ],
+    "airline_code": "UBT",
+    "airport_codes": "EGKK-FACT",
+    "callsign": "UBT795",
+    "number": "795",
+    "plausible": true
+  }
+]

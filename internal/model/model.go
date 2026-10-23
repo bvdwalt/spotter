@@ -18,6 +18,21 @@ type Position struct {
 	Time       time.Time `json:"time"`
 }
 
+type Airport struct {
+	IATA string  `json:"iata"`
+	ICAO string  `json:"icao"`
+	Name string  `json:"name"`
+	Lat  float64 `json:"lat"`
+	Lon  float64 `json:"lon"`
+}
+
+// Route is the scheduled origin and destination looked up by callsign; aircraft only.
+type Route struct {
+	From      Airport `json:"from"`
+	To        Airport `json:"to"`
+	Plausible bool    `json:"plausible"`
+}
+
 type Contact struct {
 	ID          string    `json:"id"` // "a:<hex>" or "v:<mmsi>"
 	Kind        Kind      `json:"kind"`
@@ -37,6 +52,7 @@ type Contact struct {
 	NavStatus   *int      `json:"nav_status,omitempty"`
 	Destination string    `json:"destination,omitempty"`
 	Military    bool      `json:"military"`
+	Route       *Route    `json:"route,omitempty"`
 	Source      string    `json:"source"`
 	Seen        time.Time `json:"seen"`
 	DistanceKm  float64   `json:"distance_km"`

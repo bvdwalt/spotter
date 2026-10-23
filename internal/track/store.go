@@ -54,6 +54,9 @@ func (s *Store) Upsert(c model.Contact) model.Contact {
 	if c.Destination == "" {
 		c.Destination = e.contact.Destination
 	}
+	if c.Route == nil {
+		c.Route = e.contact.Route
+	}
 	e.contact = c
 	if n := len(e.track); n == 0 || c.Seen.Sub(e.track[n-1].Time) >= s.opts.TrackMinInterval {
 		e.track = append(e.track, c.Position())
@@ -106,6 +109,28 @@ func (s *Store) Track(id string) ([]model.Position, bool) {
 	out := make([]model.Position, len(e.track))
 	copy(out, e.track)
 	return out, true
+}
+
+// SetRoute attaches a resolved route to a contact if it is still present.
+func (s *Store) SetRoute(id string, r *model.Route) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if e, ok := s.m[id]; ok {
+		e.contact.Route = r
+	}
+}
+
+// Unrouted returns aircraft that have no route yet.
+func (s *Store) Unrouted() []model.Contact {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	var out []model.Contact
+	for _, e := range s.m {
+		if e.contact.Kind == model.KindAircraft && e.contact.Route == nil {
+			out = append(out, e.contact)
+		}
+	}
+	return out
 }
 
 func (s *Store) Counts() map[model.Kind]int {

@@ -13,6 +13,7 @@ import (
 	"github.com/bvdwalt/spotter/internal/alert"
 	"github.com/bvdwalt/spotter/internal/config"
 	"github.com/bvdwalt/spotter/internal/model"
+	"github.com/bvdwalt/spotter/internal/route"
 	"github.com/bvdwalt/spotter/internal/server"
 	"github.com/bvdwalt/spotter/internal/source/adsb"
 	"github.com/bvdwalt/spotter/internal/source/ais"
@@ -76,6 +77,12 @@ func run(ctx context.Context, cfg *config.Config) error {
 		}
 	}()
 
+	if cfg.RouteAPIURL == "" {
+		slog.Info("ROUTE_API_URL empty, route lookups disabled")
+	} else {
+		go resolveRoutes(ctx, route.New(cfg.RouteAPIURL), store)
+	}
+
 	srv := &http.Server{
 		Addr: ":" + cfg.Port,
 		Handler: server.New(server.Deps{
@@ -113,6 +120,30 @@ func run(ctx context.Context, cfg *config.Config) error {
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	return srv.Shutdown(shutdownCtx)
+}
+
+// resolveRoutes periodically looks up routes for aircraft that have none; the resolver caches misses.
+func resolveRoutes(ctx context.Context, resolver *route.Resolver, store *track.Store) {
+	ticker := time.NewTicker(10 * time.Second)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+		}
+		unrouted := store.Unrouted()
+		queries := make([]route.Query, 0, len(unrouted))
+		for _, c := range unrouted {
+			queries = append(queries, route.Query{Callsign: c.Label, Lat: c.Lat, Lon: c.Lon})
+		}
+		found := resolver.Lookup(ctx, queries)
+		for _, c := range unrouted {
+			if r := found[c.Label]; r != nil {
+				store.SetRoute(c.ID, r)
+			}
+		}
+	}
 }
 
 func main() {

@@ -18,6 +18,7 @@ type Config struct {
 	ADSBPollInterval time.Duration
 	AISStreamAPIKey  string
 	AISBBox          [2][2]float64 // [[latSW, lonSW], [latNE, lonNE]]
+	RouteAPIURL      string        // empty disables route lookups
 	NtfyURL          string
 	NtfyToken        string
 	WatchList        []string
@@ -33,6 +34,7 @@ func Load() (*Config, error) {
 		Port:            getEnv("PORT", "8080"),
 		ADSBBaseURL:     getEnv("ADSB_BASE_URL", "https://api.adsb.lol/v2"),
 		AISStreamAPIKey: os.Getenv("AISSTREAM_API_KEY"),
+		RouteAPIURL:     getEnv("ROUTE_API_URL", "https://adsb.im/api/0/routeset"),
 		NtfyURL:         os.Getenv("NTFY_URL"),
 		NtfyToken:       os.Getenv("NTFY_TOKEN"),
 	}
