@@ -34,8 +34,9 @@ type Resolver struct {
 	URL    string
 	Client *http.Client
 
-	mu    sync.Mutex
-	cache map[string]cached
+	mu      sync.Mutex
+	cache   map[string]cached
+	pausedT time.Time // no upstream calls before this after a 429
 }
 
 func New(url string) *Resolver {
@@ -49,13 +50,14 @@ func (r *Resolver) Lookup(ctx context.Context, queries []Query) map[string]*mode
 	out := make(map[string]*model.Route, len(queries))
 	var missing []Query
 	r.mu.Lock()
+	paused := now.Before(r.pausedT)
 	for _, q := range queries {
 		if q.Callsign == "" {
 			continue
 		}
 		if c, ok := r.cache[q.Callsign]; ok && now.Before(c.expires) {
 			out[q.Callsign] = c.route
-		} else {
+		} else if !paused {
 			missing = append(missing, q)
 		}
 	}
@@ -127,6 +129,12 @@ func (r *Resolver) fetch(ctx context.Context, batch []Query) (map[string]*model.
 		return nil, err
 	}
 	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode == http.StatusTooManyRequests {
+		r.mu.Lock()
+		r.pausedT = time.Now().Add(5 * time.Minute)
+		r.mu.Unlock()
+		return nil, fmt.Errorf("rate limited (429), pausing route lookups for 5m")
+	}
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("unexpected status %d", resp.StatusCode)
 	}

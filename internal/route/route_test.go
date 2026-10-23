@@ -61,3 +61,18 @@ func TestLookupUpstreamErrorLeavesCacheEmpty(t *testing.T) {
 		t.Errorf("error should cache nothing: %v %v", out, res.cache)
 	}
 }
+
+func TestLookupPausesAfter429(t *testing.T) {
+	calls := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		w.WriteHeader(http.StatusTooManyRequests)
+	}))
+	defer srv.Close()
+	res := New(srv.URL)
+	res.Lookup(context.Background(), []Query{{Callsign: "SFR806"}})
+	res.Lookup(context.Background(), []Query{{Callsign: "SFR806"}})
+	if calls != 1 {
+		t.Errorf("second lookup should be paused, got %d calls", calls)
+	}
+}

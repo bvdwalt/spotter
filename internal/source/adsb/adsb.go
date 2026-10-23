@@ -4,11 +4,13 @@ package adsb
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"math"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -16,7 +18,18 @@ import (
 	"github.com/bvdwalt/spotter/internal/model"
 )
 
-const maxBackoff = 60 * time.Second
+const (
+	maxBackoff      = 60 * time.Second
+	maxRetryAfter   = 10 * time.Minute
+	defaultRetry429 = 30 * time.Second
+)
+
+// RateLimitedError carries the server's requested pause after an HTTP 429.
+type RateLimitedError struct{ RetryAfter time.Duration }
+
+func (e RateLimitedError) Error() string {
+	return "rate limited (429), retrying in " + e.RetryAfter.Round(time.Second).String()
+}
 
 type Source struct {
 	BaseURL  string
@@ -63,6 +76,12 @@ func (s *Source) Run(ctx context.Context, out chan<- model.Contact) error {
 				return nil
 			}
 			s.recordError(err)
+			var rl RateLimitedError
+			if errors.As(err, &rl) {
+				wait = rl.RetryAfter
+			} else {
+				wait = min(wait*2, maxBackoff)
+			}
 			slog.Warn("adsb poll failed", "source", s.Name(), "err", err, "retry_in", wait)
 		} else {
 			s.recordSuccess(len(contacts))
@@ -80,9 +99,6 @@ func (s *Source) Run(ctx context.Context, out chan<- model.Contact) error {
 			return nil
 		case <-time.After(wait):
 		}
-		if err != nil {
-			wait = min(wait*2, maxBackoff)
-		}
 	}
 }
 
@@ -98,10 +114,23 @@ func (s *Source) Poll(ctx context.Context) ([]model.Contact, error) {
 		return nil, err
 	}
 	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode == http.StatusTooManyRequests {
+		return nil, RateLimitedError{RetryAfter: retryAfter(resp.Header, max(s.Interval, defaultRetry429))}
+	}
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("unexpected status %d", resp.StatusCode)
 	}
 	return Parse(json.NewDecoder(resp.Body), s.Name(), time.Now())
+}
+
+// retryAfter reads Retry-After (seconds) or x-ratelimit-reset, bounded to something sane.
+func retryAfter(h http.Header, fallback time.Duration) time.Duration {
+	for _, key := range []string{"Retry-After", "X-Ratelimit-Reset"} {
+		if secs, err := strconv.ParseFloat(strings.TrimSpace(h.Get(key)), 64); err == nil && secs > 0 {
+			return min(max(time.Duration(secs*float64(time.Second)), fallback), maxRetryAfter)
+		}
+	}
+	return fallback
 }
 
 func fmtCoord(f float64) string { return fmt.Sprintf("%.4f", f) }

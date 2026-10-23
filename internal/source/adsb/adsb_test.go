@@ -3,6 +3,7 @@ package adsb
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -90,5 +91,34 @@ func TestPollBuildsURL(t *testing.T) {
 	}
 	if len(contacts) == 0 {
 		t.Error("no contacts")
+	}
+}
+
+func TestPollRateLimited(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Retry-After", "120")
+		w.WriteHeader(http.StatusTooManyRequests)
+	}))
+	defer srv.Close()
+	s := New(srv.URL, 0, 0, 10, 5*time.Second)
+	_, err := s.Poll(context.Background())
+	var rl RateLimitedError
+	if !errors.As(err, &rl) || rl.RetryAfter != 120*time.Second {
+		t.Fatalf("want RateLimitedError with 120s, got %v", err)
+	}
+}
+
+func TestRetryAfterBounds(t *testing.T) {
+	h := http.Header{}
+	if got := retryAfter(h, 30*time.Second); got != 30*time.Second {
+		t.Errorf("fallback: %v", got)
+	}
+	h.Set("X-Ratelimit-Reset", "1")
+	if got := retryAfter(h, 30*time.Second); got != 30*time.Second {
+		t.Errorf("below fallback should clamp up: %v", got)
+	}
+	h.Set("Retry-After", "99999")
+	if got := retryAfter(h, 30*time.Second); got != maxRetryAfter {
+		t.Errorf("huge value should clamp to max: %v", got)
 	}
 }
