@@ -41,8 +41,16 @@
         <span class="sub">{c.kind} · {c.source}</span>
       </div>
       <div class="actions">
-        <button class="watch" class:on={store.isWatched(c.id)} onclick={() => store.toggleWatch(c.id)}>
-          {store.isWatched(c.id) ? "watching" : "watch"}
+        <button class="watch" class:on={store.follow} onclick={() => (store.follow = !store.follow)}>
+          {store.follow ? "following" : "follow"}
+        </button>
+        <button
+          class="watch"
+          class:on={store.isWatched(c.id)}
+          title="Notify whenever this contact appears"
+          onclick={() => store.toggleWatch(c.id)}
+        >
+          {store.isWatched(c.id) ? "alerting" : "alert me"}
         </button>
         <button class="close" onclick={() => store.select(null)} aria-label="Close">×</button>
       </div>

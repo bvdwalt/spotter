@@ -76,3 +76,28 @@ func TestLookupPausesAfter429(t *testing.T) {
 		t.Errorf("second lookup should be paused, got %d calls", calls)
 	}
 }
+
+func TestSuffixFallback(t *testing.T) {
+	var asked []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body struct{ Planes []requestPlane }
+		_ = json.NewDecoder(r.Body).Decode(&body)
+		for _, p := range body.Planes {
+			asked = append(asked, p.Callsign)
+		}
+		_, _ = w.Write([]byte(`[{"callsign":"LNK351Q","airport_codes":"unknown","_airports":[]},
+		  {"callsign":"LNK351","airport_codes":"FIMP-FACT","plausible":true,"_airports":[{"iata":"MRU","icao":"FIMP"},{"iata":"CPT","icao":"FACT"}]}]`))
+	}))
+	defer srv.Close()
+	res := New(srv.URL)
+	out := res.Lookup(context.Background(), []Query{{Callsign: "LNK351Q"}})
+	if len(asked) != 2 || asked[1] != "LNK351" {
+		t.Errorf("should also ask for the bare callsign, asked %v", asked)
+	}
+	if rt := out["LNK351Q"]; rt == nil || rt.From.IATA != "MRU" {
+		t.Errorf("fallback route = %+v", rt)
+	}
+	if bareCallsign("SAA372") != "SAA372" || bareCallsign("ZSFHH") != "ZSFHH" || bareCallsign("UBT795A") != "UBT795" {
+		t.Error("bareCallsign rules")
+	}
+}

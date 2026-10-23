@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"regexp"
 	"sync"
 	"time"
 
@@ -65,11 +66,11 @@ func (r *Resolver) Lookup(ctx context.Context, queries []Query) map[string]*mode
 
 	for len(missing) > 0 {
 		batch := missing
-		if len(batch) > maxBatch {
-			batch = missing[:maxBatch]
+		if len(batch) > maxBatch/2 {
+			batch = missing[:maxBatch/2]
 		}
 		missing = missing[len(batch):]
-		found, err := r.fetch(ctx, batch)
+		found, err := r.fetch(ctx, withBareVariants(batch))
 		if err != nil {
 			slog.Warn("route lookup failed", "err", err, "callsigns", len(batch))
 			return out
@@ -77,6 +78,10 @@ func (r *Resolver) Lookup(ctx context.Context, queries []Query) map[string]*mode
 		r.mu.Lock()
 		for _, q := range batch {
 			rt := found[q.Callsign]
+			if rt == nil {
+				// Airlines append a letter to the flight number on some legs (LNK351Q); the database knows LNK351.
+				rt = found[bareCallsign(q.Callsign)]
+			}
 			ttl := negativeTTL
 			if rt != nil {
 				ttl = positiveTTL
@@ -85,6 +90,28 @@ func (r *Resolver) Lookup(ctx context.Context, queries []Query) map[string]*mode
 			out[q.Callsign] = rt
 		}
 		r.mu.Unlock()
+	}
+	return out
+}
+
+var suffixed = regexp.MustCompile(`^([A-Z]{3}[0-9]{1,4})[A-Z]$`)
+
+// bareCallsign strips a single trailing letter from an airline callsign; other callsigns are returned unchanged.
+func bareCallsign(callsign string) string {
+	if m := suffixed.FindStringSubmatch(callsign); m != nil {
+		return m[1]
+	}
+	return callsign
+}
+
+// withBareVariants adds the suffix-stripped form of each suffixed callsign to the batch.
+func withBareVariants(batch []Query) []Query {
+	out := make([]Query, 0, len(batch)*2)
+	for _, q := range batch {
+		out = append(out, q)
+		if bare := bareCallsign(q.Callsign); bare != q.Callsign {
+			out = append(out, Query{Callsign: bare, Lat: q.Lat, Lon: q.Lon})
+		}
 	}
 	return out
 }
