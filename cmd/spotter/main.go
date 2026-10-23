@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -95,6 +96,7 @@ func run(ctx context.Context, cfg *config.Config) error {
 			Store:   store,
 			Alerts:  alerts,
 			Photos:  photos,
+			PMTiles: cfg.BasemapPMTiles,
 			Sources: sources,
 			Version: version,
 			Config: server.ClientConfig{
@@ -103,6 +105,7 @@ func run(ctx context.Context, cfg *config.Config) error {
 				VesselExpiryS:   cfg.VesselExpiry.Seconds(),
 				TrackWindowS:    cfg.TrackWindow.Seconds(),
 				PollIntervalS:   cfg.ADSBPollInterval.Seconds(),
+				BasemapURL:      basemapURL(cfg.BasemapPMTiles),
 			},
 		}),
 		ReadHeaderTimeout: 10 * time.Second,
@@ -127,6 +130,17 @@ func run(ctx context.Context, cfg *config.Config) error {
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	return srv.Shutdown(shutdownCtx)
+}
+
+// basemapURL carries the file's mtime so browsers refetch a replaced extract despite long caching.
+func basemapURL(pmtiles string) string {
+	if pmtiles == "" {
+		return ""
+	}
+	if st, err := os.Stat(pmtiles); err == nil {
+		return fmt.Sprintf("/basemap.pmtiles?v=%d", st.ModTime().Unix())
+	}
+	return "/basemap.pmtiles"
 }
 
 // resolveRoutes periodically looks up routes for aircraft that have none; the resolver caches misses.

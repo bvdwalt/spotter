@@ -10,6 +10,7 @@ class ContactStore {
   selectedId = $state<string | null>(null);
   track = $state<Position[]>([]);
   hideGround = $state(true);
+  follow = $state(false);
   kind = $state<"all" | Kind>("all");
   query = $state("");
   error = $state<string | null>(null);
@@ -87,9 +88,11 @@ class ContactStore {
     }
   }
 
+  /** Dismissing a watch-list alert also stops alerting for that contact; clear-all leaves the watch list alone. */
   async dismissAlert(a: Alert) {
     this.alerts = this.alerts.filter((x) => x !== a);
     await api.dismissAlert(a).catch(() => undefined);
+    if (a.rule === "watchlist" && this.isWatched(a.contact_id)) await this.toggleWatch(a.contact_id);
   }
 
   async clearAlerts() {
@@ -100,6 +103,7 @@ class ContactStore {
   async select(id: string | null) {
     this.selectedId = id;
     this.track = [];
+    if (!id) this.follow = false;
     if (id) await this.refreshTrack();
   }
 

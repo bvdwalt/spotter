@@ -57,6 +57,7 @@ export interface ClientConfig {
   vessel_expiry_s: number;
   track_window_s: number;
   poll_interval_s: number;
+  basemap_url?: string;
 }
 
 export interface SourceStatus {

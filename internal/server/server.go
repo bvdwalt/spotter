@@ -23,12 +23,14 @@ type ClientConfig struct {
 	VesselExpiryS   float64 `json:"vessel_expiry_s"`
 	TrackWindowS    float64 `json:"track_window_s"`
 	PollIntervalS   float64 `json:"poll_interval_s"`
+	BasemapURL      string  `json:"basemap_url,omitempty"` // set when a local PMTiles basemap is served
 }
 
 type Deps struct {
 	Store   *track.Store
 	Alerts  *alert.Engine
 	Photos  *photo.Client // nil disables /photo
+	PMTiles string        // path to a PMTiles file; empty disables /basemap.pmtiles
 	Sources []model.StatusReporter
 	Config  ClientConfig
 	Version string
@@ -55,6 +57,13 @@ func New(d Deps) http.Handler {
 		r.Delete("/watch/{id}", h.unwatch)
 		r.Get("/config", h.config)
 	})
+	if d.PMTiles != "" {
+		// http.ServeFile handles the Range requests the pmtiles client relies on.
+		r.Get("/basemap.pmtiles", func(w http.ResponseWriter, req *http.Request) {
+			w.Header().Set("Cache-Control", "public, max-age=86400")
+			http.ServeFile(w, req, d.PMTiles)
+		})
+	}
 	r.Handle("/*", spaHandler())
 	return r
 }

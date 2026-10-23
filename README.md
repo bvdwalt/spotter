@@ -35,6 +35,7 @@ docker run -p 8080:8080 -e HOME_LAT=-26.2 -e HOME_LON=28.05 spotter
 | `TRACK_WINDOW` | `15m` | recent positions kept per contact |
 | `TRACK_MIN_INTERVAL` | `10s` | downsample interval for tracks |
 | `ROUTE_API_URL` | `https://adsb.im/api/0/routeset` | route lookup by callsign; empty disables |
+| `BASEMAP_PMTILES` | empty | path to a Protomaps PMTiles extract; empty uses OpenFreeMap tiles |
 | `PHOTO_API_URL` | `https://api.planespotters.net/pub/photos/hex` | aircraft photos; empty disables |
 | `NTFY_URL` | empty | ntfy topic URL for alerts; empty keeps alerts in the UI only |
 | `NTFY_TOKEN` | empty | bearer token for ntfy, if the topic needs one |
@@ -54,6 +55,20 @@ docker run -p 8080:8080 -e HOME_LAT=-26.2 -e HOME_LON=28.05 spotter
 | `GET /api/status` | per-source health and contact counts |
 | `GET /api/alerts` | recent alerts, newest first |
 | `GET /api/config` | home point, radius, expiry values for the UI |
+
+## Self-hosted basemap
+
+By default the browser loads tiles from OpenFreeMap. To keep all map traffic on
+the LAN, download a Protomaps extract and point the server at it:
+
+```bash
+go install github.com/protomaps/go-pmtiles@latest
+just basemap            # southern Africa, zoom 12, about 120 MB into data/
+BASEMAP_PMTILES=data/basemap.pmtiles just dev
+```
+
+`just basemap "lonW,latS,lonE,latN" 13` changes the region or detail. Fonts and
+sprites for the Protomaps light style are bundled under `web/public/basemap`.
 
 ## Alerts
 

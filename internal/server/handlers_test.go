@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
 	"testing"
 	"time"
 
@@ -112,5 +113,25 @@ func TestWatchEndpoints(t *testing.T) {
 func TestPhotoDisabled(t *testing.T) {
 	if code, _ := get(t, newTestServer(), "/api/contacts/a:1/photo"); code != 404 {
 		t.Errorf("photo without client: %d", code)
+	}
+}
+
+func TestBasemapRange(t *testing.T) {
+	f, err := os.CreateTemp(t.TempDir(), "*.pmtiles")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, _ = f.WriteString("0123456789")
+	_ = f.Close()
+	h := New(Deps{Store: track.New(track.Options{}), Alerts: alert.New(alert.Options{}, nil), PMTiles: f.Name()})
+	req := httptest.NewRequest(http.MethodGet, "/basemap.pmtiles", nil)
+	req.Header.Set("Range", "bytes=2-4")
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusPartialContent || rec.Body.String() != "234" {
+		t.Errorf("range: %d %q", rec.Code, rec.Body.String())
+	}
+	if code, _ := get(t, newTestServer(), "/basemap.pmtiles"); code == http.StatusPartialContent {
+		t.Error("without PMTiles the route should fall through to the SPA")
 	}
 }

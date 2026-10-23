@@ -33,6 +33,16 @@ run: build
     @echo "Running {{BINARY_NAME}}..."
     @{{BINARY_PATH}}
 
+# Download a Protomaps PMTiles extract for the region into data/ (set BASEMAP_PMTILES=data/basemap.pmtiles to use it).
+# Requires: go install github.com/protomaps/go-pmtiles@latest
+basemap bbox="15,-36,34,-21" maxzoom="12":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    mkdir -p data
+    build=$(date -u -v-1d +%Y%m%d 2>/dev/null || date -u -d yesterday +%Y%m%d)
+    go-pmtiles extract "https://build.protomaps.com/${build}.pmtiles" data/basemap.pmtiles --bbox={{bbox}} --maxzoom={{maxzoom}}
+    ls -lh data/basemap.pmtiles
+
 # Run the Go backend on :8080 with vars from .env (run `just web-dev` alongside for Vite on :5173)
 dev:
     #!/usr/bin/env bash

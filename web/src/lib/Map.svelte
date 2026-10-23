@@ -1,12 +1,33 @@
 <script lang="ts">
-  import maplibregl, { type GeoJSONSource } from "maplibre-gl";
+  import maplibregl, { type GeoJSONSource, type StyleSpecification } from "maplibre-gl";
   import "maplibre-gl/dist/maplibre-gl.css";
+  import { Protocol } from "pmtiles";
+  import { layers as basemapLayers, namedFlavor } from "@protomaps/basemaps";
   import type { Contact } from "./api";
   import { ICONS, loadIcon } from "./icons";
   import { store } from "./contacts.svelte";
   import { greatCircle } from "./geo";
 
-  const STYLE = "https://tiles.openfreemap.org/styles/positron";
+  const OPENFREEMAP_STYLE = "https://tiles.openfreemap.org/styles/positron";
+
+  /** Local PMTiles basemap with fonts and sprites served from this origin, so nothing leaves the LAN. */
+  function localStyle(basemapUrl: string): StyleSpecification {
+    return {
+      version: 8,
+      glyphs: `${location.origin}/basemap/fonts/{fontstack}/{range}.pbf`,
+      sprite: `${location.origin}/basemap/sprites/v4/light`,
+      sources: {
+        protomaps: {
+          type: "vector",
+          url: `pmtiles://${location.origin}${basemapUrl}`,
+          attribution: '<a href="https://protomaps.com">Protomaps</a> © <a href="https://openstreetmap.org">OpenStreetMap</a>',
+        },
+      },
+      layers: basemapLayers("protomaps", namedFlavor("light"), { lang: "en" }),
+    };
+  }
+
+  let protocolRegistered = false;
   let container: HTMLDivElement;
   let map: maplibregl.Map | null = null;
   let ready = $state(false);
@@ -79,9 +100,13 @@
   $effect(() => {
     const cfg = store.config;
     if (!cfg || map) return;
+    if (cfg.basemap_url && !protocolRegistered) {
+      maplibregl.addProtocol("pmtiles", new Protocol().tile);
+      protocolRegistered = true;
+    }
     map = new maplibregl.Map({
       container,
-      style: STYLE,
+      style: cfg.basemap_url ? localStyle(cfg.basemap_url) : OPENFREEMAP_STYLE,
       center: [cfg.home_lon, cfg.home_lat],
       zoom: 7,
       attributionControl: { compact: true },
@@ -188,6 +213,24 @@
   $effect(() => {
     if (!ready || !map) return;
     (map.getSource("route") as GeoJSONSource | undefined)?.setData(routeGeoJSON());
+  });
+
+  // Follow: re-centre on the selected contact whenever its position changes.
+  $effect(() => {
+    const sel = store.selected;
+    if (!ready || !map || !store.follow || !sel) return;
+    map.easeTo({ center: [sel.lon, sel.lat], duration: 800 });
+  });
+
+  // Dragging the map is the natural way to stop following.
+  $effect(() => {
+    if (!ready || !map) return;
+    const m = map;
+    const stop = () => (store.follow = false);
+    m.on("dragstart", stop);
+    return () => {
+      m.off("dragstart", stop);
+    };
   });
 </script>
 
