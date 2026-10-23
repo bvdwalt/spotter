@@ -57,6 +57,9 @@ func (s *Store) Upsert(c model.Contact) model.Contact {
 	if c.Route == nil {
 		c.Route = e.contact.Route
 	}
+	if c.ETA == nil {
+		c.ETA = e.contact.ETA
+	}
 	e.contact = c
 	if n := len(e.track); n == 0 || c.Seen.Sub(e.track[n-1].Time) >= s.opts.TrackMinInterval {
 		e.track = append(e.track, c.Position())

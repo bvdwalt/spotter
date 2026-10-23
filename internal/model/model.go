@@ -34,28 +34,29 @@ type Route struct {
 }
 
 type Contact struct {
-	ID          string    `json:"id"` // "a:<hex>" or "v:<mmsi>"
-	Kind        Kind      `json:"kind"`
-	Label       string    `json:"label"`
-	Lat         float64   `json:"lat"`
-	Lon         float64   `json:"lon"`
-	AltFt       *int      `json:"alt_ft,omitempty"`
-	SpeedKt     *float64  `json:"speed_kt,omitempty"`
-	HeadingDeg  *float64  `json:"heading_deg,omitempty"`
-	VSFpm       *int      `json:"vs_fpm,omitempty"`
-	OnGround    bool      `json:"on_ground"`
-	Type        string    `json:"type,omitempty"`
-	Reg         string    `json:"reg,omitempty"`
-	Squawk      string    `json:"squawk,omitempty"`
-	Emergency   string    `json:"emergency,omitempty"`
-	Category    string    `json:"category,omitempty"`
-	NavStatus   *int      `json:"nav_status,omitempty"`
-	Destination string    `json:"destination,omitempty"`
-	Military    bool      `json:"military"`
-	Route       *Route    `json:"route,omitempty"`
-	Source      string    `json:"source"`
-	Seen        time.Time `json:"seen"`
-	DistanceKm  float64   `json:"distance_km"`
+	ID          string     `json:"id"` // "a:<hex>" or "v:<mmsi>"
+	Kind        Kind       `json:"kind"`
+	Label       string     `json:"label"`
+	Lat         float64    `json:"lat"`
+	Lon         float64    `json:"lon"`
+	AltFt       *int       `json:"alt_ft,omitempty"`
+	SpeedKt     *float64   `json:"speed_kt,omitempty"`
+	HeadingDeg  *float64   `json:"heading_deg,omitempty"`
+	VSFpm       *int       `json:"vs_fpm,omitempty"`
+	OnGround    bool       `json:"on_ground"`
+	Type        string     `json:"type,omitempty"`
+	Reg         string     `json:"reg,omitempty"`
+	Squawk      string     `json:"squawk,omitempty"`
+	Emergency   string     `json:"emergency,omitempty"`
+	Category    string     `json:"category,omitempty"`
+	NavStatus   *int       `json:"nav_status,omitempty"`
+	Destination string     `json:"destination,omitempty"`
+	ETA         *time.Time `json:"eta,omitempty"` // vessel only, as reported by the crew
+	Military    bool       `json:"military"`
+	Route       *Route     `json:"route,omitempty"`
+	Source      string     `json:"source"`
+	Seen        time.Time  `json:"seen"`
+	DistanceKm  float64    `json:"distance_km"`
 }
 
 func (c Contact) Position() Position {

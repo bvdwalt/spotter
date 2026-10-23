@@ -6,6 +6,7 @@ class ContactStore {
   contacts = $state<Contact[]>([]);
   status = $state<Status | null>(null);
   alerts = $state<Alert[]>([]);
+  watch = $state<string[]>([]);
   selectedId = $state<string | null>(null);
   track = $state<Position[]>([]);
   hideGround = $state(true);
@@ -38,10 +39,16 @@ class ContactStore {
     this.config = await api.config();
     const tick = async () => {
       try {
-        const [list, status, alerts] = await Promise.all([api.contacts(), api.status(), api.alerts()]);
+        const [list, status, alerts, watch] = await Promise.all([
+          api.contacts(),
+          api.status(),
+          api.alerts(),
+          api.watchList(),
+        ]);
         this.contacts = list.contacts;
         this.status = status;
         this.alerts = alerts.alerts;
+        this.watch = watch.watch;
         this.now = Date.now();
         this.error = null;
         if (this.selectedId) {
@@ -55,6 +62,32 @@ class ContactStore {
     await tick();
     setInterval(tick, (this.config?.poll_interval_s ?? 5) * 1000);
     setInterval(() => (this.now = Date.now()), 1000);
+  }
+
+  /** Watch-list keys are bare hex codes and MMSIs, lower-case. */
+  isWatched(id: string): boolean {
+    return this.watch.includes(id.slice(2).toLowerCase());
+  }
+
+  async toggleWatch(id: string) {
+    const key = id.slice(2).toLowerCase();
+    if (this.isWatched(id)) {
+      this.watch = this.watch.filter((w) => w !== key);
+      await api.unwatch(id).catch(() => undefined);
+    } else {
+      this.watch = [...this.watch, key];
+      await api.watch(id).catch(() => undefined);
+    }
+  }
+
+  async dismissAlert(a: Alert) {
+    this.alerts = this.alerts.filter((x) => x !== a);
+    await api.dismissAlert(a).catch(() => undefined);
+  }
+
+  async clearAlerts() {
+    this.alerts = [];
+    await api.clearAlerts().catch(() => undefined);
   }
 
   async select(id: string | null) {

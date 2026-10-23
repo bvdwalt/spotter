@@ -32,6 +32,7 @@ export interface Contact {
   category?: string;
   nav_status?: number;
   destination?: string;
+  eta?: string;
   military: boolean;
   route?: Route;
   source: string;
@@ -92,7 +93,23 @@ async function getJSON<T>(path: string): Promise<T> {
   return r.json() as Promise<T>;
 }
 
+async function del(path: string): Promise<void> {
+  const r = await fetch(path, { method: "DELETE" });
+  if (!r.ok && r.status !== 404) throw new Error(`${path}: HTTP ${r.status}`);
+}
+
+async function put(path: string): Promise<void> {
+  const r = await fetch(path, { method: "PUT" });
+  if (!r.ok) throw new Error(`${path}: HTTP ${r.status}`);
+}
+
 export const api = {
+  watchList: () => getJSON<{ watch: string[] }>("/api/watch"),
+  watch: (id: string) => put(`/api/watch/${encodeURIComponent(id)}`),
+  unwatch: (id: string) => del(`/api/watch/${encodeURIComponent(id)}`),
+  clearAlerts: () => del("/api/alerts"),
+  dismissAlert: (a: Alert) =>
+    del(`/api/alerts/${a.rule}/${encodeURIComponent(a.contact_id)}?at=${encodeURIComponent(a.time)}`),
   config: () => getJSON<ClientConfig>("/api/config"),
   contacts: () => getJSON<{ now: string; contacts: Contact[] }>("/api/contacts"),
   track: (id: string) => getJSON<{ positions: Position[] }>(`/api/contacts/${encodeURIComponent(id)}/track`),

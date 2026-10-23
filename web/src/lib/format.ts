@@ -30,3 +30,21 @@ export function navStatusText(code: number | undefined): string {
   if (code === undefined) return "–";
   return NAV_STATUS[code] ?? `status ${code}`;
 }
+
+export function durationText(ms: number): string {
+  const m = Math.round(ms / 60000);
+  if (m < 1) return "under a minute";
+  if (m < 60) return `${m} min`;
+  const h = Math.floor(m / 60);
+  return `${h}h ${String(m % 60).padStart(2, "0")}m`;
+}
+
+export function clockText(iso: string | Date): string {
+  const d = typeof iso === "string" ? new Date(iso) : iso;
+  return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
+
+export function dateTimeText(iso: string | Date): string {
+  const d = typeof iso === "string" ? new Date(iso) : iso;
+  return d.toLocaleString([], { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+}

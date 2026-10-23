@@ -4,6 +4,7 @@ package alert
 import (
 	"context"
 	"log/slog"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -41,6 +42,47 @@ type Engine struct {
 	mu     sync.Mutex
 	fired  map[string]time.Time // rule + contact id
 	recent []Alert
+}
+
+// watchKey strips the kind prefix so hex codes and MMSIs match the watch list as typed.
+func watchKey(contactID string) string {
+	return strings.ToLower(strings.TrimPrefix(strings.TrimPrefix(contactID, "a:"), "v:"))
+}
+
+// Watch adds a contact id (or bare hex/MMSI) to the watch list; it fires on the next update.
+func (e *Engine) Watch(id string) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.watch[watchKey(id)] = true
+}
+
+// Unwatch removes a contact and forgets its cooldown so a later Watch alerts again.
+func (e *Engine) Unwatch(id string) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	delete(e.watch, watchKey(id))
+	for key := range e.fired {
+		if strings.HasPrefix(key, "watchlist|") && watchKey(strings.TrimPrefix(key, "watchlist|")) == watchKey(id) {
+			delete(e.fired, key)
+		}
+	}
+}
+
+func (e *Engine) Watching(id string) bool {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	return e.watch[watchKey(id)]
+}
+
+func (e *Engine) WatchList() []string {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	out := make([]string, 0, len(e.watch))
+	for k := range e.watch {
+		out = append(out, k)
+	}
+	sort.Strings(out)
+	return out
 }
 
 func New(opts Options, sink Sink) *Engine {
@@ -81,6 +123,26 @@ func (e *Engine) Recent() []Alert {
 	return out
 }
 
+// Clear drops the recent list; cooldowns stay so cleared alerts do not immediately re-fire.
+func (e *Engine) Clear() {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.recent = nil
+}
+
+// Dismiss removes one alert from the recent list, matched by rule, contact, and time.
+func (e *Engine) Dismiss(rule, contactID string, at time.Time) bool {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	for i, a := range e.recent {
+		if a.Rule == rule && a.ContactID == contactID && a.Time.Equal(at) {
+			e.recent = append(e.recent[:i], e.recent[i+1:]...)
+			return true
+		}
+	}
+	return false
+}
+
 func (e *Engine) evaluate(c model.Contact) []Alert {
 	var out []Alert
 	now := c.Seen
@@ -103,7 +165,7 @@ func (e *Engine) evaluate(c model.Contact) []Alert {
 			Message: joinParts(c.Type, c.Reg, where),
 		})
 	}
-	if e.watch[strings.ToLower(strings.TrimPrefix(strings.TrimPrefix(c.ID, "a:"), "v:"))] {
+	if e.Watching(c.ID) {
 		out = append(out, Alert{
 			Rule: "watchlist", ContactID: c.ID, Label: c.Label, Kind: c.Kind, Time: now,
 			Title:   "Watch list: " + c.Label,

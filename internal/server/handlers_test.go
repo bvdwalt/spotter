@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"testing"
 	"time"
 
@@ -55,9 +56,24 @@ func TestContactsAndTrack(t *testing.T) {
 }
 
 func TestAlerts(t *testing.T) {
-	code, body := get(t, newTestServer(), "/api/alerts")
+	h := newTestServer()
+	code, body := get(t, h, "/api/alerts")
 	if code != 200 || len(body["alerts"].([]any)) != 1 {
 		t.Fatalf("alerts: %d %v", code, body)
+	}
+	a := body["alerts"].([]any)[0].(map[string]any)
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodDelete, "/api/alerts/emergency/a%3A9?at="+url.QueryEscape(a["time"].(string)), nil))
+	if rec.Code != 204 {
+		t.Fatalf("dismiss: %d %s", rec.Code, rec.Body.String())
+	}
+	if code, body := get(t, h, "/api/alerts"); code != 200 || len(body["alerts"].([]any)) != 0 {
+		t.Fatalf("after dismiss: %d %v", code, body)
+	}
+	rec = httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodDelete, "/api/alerts", nil))
+	if rec.Code != 204 {
+		t.Fatalf("clear: %d", rec.Code)
 	}
 }
 
@@ -69,5 +85,26 @@ func TestStatusAndHealth(t *testing.T) {
 	}
 	if code, _ := get(t, h, "/health"); code != 200 {
 		t.Errorf("health: %d", code)
+	}
+}
+
+func TestWatchEndpoints(t *testing.T) {
+	h := newTestServer()
+	do := func(method, path string) int {
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, httptest.NewRequest(method, path, nil))
+		return rec.Code
+	}
+	if code := do(http.MethodPut, "/api/watch/v%3A123"); code != 204 {
+		t.Fatalf("watch: %d", code)
+	}
+	if _, body := get(t, h, "/api/watch"); len(body["watch"].([]any)) != 1 || body["watch"].([]any)[0] != "123" {
+		t.Fatalf("watch list: %v", body)
+	}
+	if code := do(http.MethodDelete, "/api/watch/v%3A123"); code != 204 {
+		t.Fatalf("unwatch: %d", code)
+	}
+	if _, body := get(t, h, "/api/watch"); len(body["watch"].([]any)) != 0 {
+		t.Fatalf("after unwatch: %v", body)
 	}
 }

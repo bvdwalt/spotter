@@ -61,6 +61,54 @@ func (h *handlers) alerts(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"alerts": recent})
 }
 
+func (h *handlers) clearAlerts(w http.ResponseWriter, r *http.Request) {
+	h.Alerts.Clear()
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// dismissAlert removes one alert; the ?at= query carries the alert's RFC 3339 time.
+func (h *handlers) dismissAlert(w http.ResponseWriter, r *http.Request) {
+	id, err := url.PathUnescape(chi.URLParam(r, "id"))
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "bad contact id"})
+		return
+	}
+	at, err := time.Parse(time.RFC3339Nano, r.URL.Query().Get("at"))
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "bad or missing at"})
+		return
+	}
+	if !h.Alerts.Dismiss(chi.URLParam(r, "rule"), id, at) {
+		writeJSON(w, http.StatusNotFound, map[string]string{"error": "unknown alert"})
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *handlers) watchList(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusOK, map[string]any{"watch": h.Alerts.WatchList()})
+}
+
+func (h *handlers) watch(w http.ResponseWriter, r *http.Request) {
+	id, err := url.PathUnescape(chi.URLParam(r, "id"))
+	if err != nil || id == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "bad contact id"})
+		return
+	}
+	h.Alerts.Watch(id)
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *handlers) unwatch(w http.ResponseWriter, r *http.Request) {
+	id, err := url.PathUnescape(chi.URLParam(r, "id"))
+	if err != nil || id == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "bad contact id"})
+		return
+	}
+	h.Alerts.Unwatch(id)
+	w.WriteHeader(http.StatusNoContent)
+}
+
 func (h *handlers) config(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, h.Config)
 }

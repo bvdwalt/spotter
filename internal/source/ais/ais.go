@@ -38,6 +38,7 @@ type Source struct {
 
 type staticInfo struct {
 	name, shipType, destination string
+	eta                         *time.Time
 }
 
 func New(apiKey string, bbox BBox) *Source {
@@ -134,6 +135,9 @@ type envelope struct {
 			Name        string `json:"Name"`
 			Type        int    `json:"Type"`
 			Destination string `json:"Destination"`
+			Eta         struct {
+				Month, Day, Hour, Minute int
+			} `json:"Eta"`
 		} `json:"ShipStaticData"`
 	} `json:"Message"`
 	Error string `json:"error"`
@@ -159,6 +163,7 @@ func (s *Source) handle(raw json.RawMessage, now time.Time) (*model.Contact, err
 	case "ShipStaticData":
 		if d := e.Message.ShipStaticData; d != nil {
 			info := staticInfo{name: name, shipType: ShipType(d.Type), destination: strings.TrimSpace(d.Destination)}
+			info.eta = parseETA(d.Eta.Month, d.Eta.Day, d.Eta.Hour, d.Eta.Minute, now)
 			if n := strings.TrimSpace(d.Name); n != "" {
 				info.name = n
 			}
@@ -183,6 +188,7 @@ func (s *Source) handle(raw json.RawMessage, now time.Time) (*model.Contact, err
 			Lon:         e.MetaData.Longitude,
 			Type:        info.shipType,
 			Destination: info.destination,
+			ETA:         info.eta,
 			Source:      sourceName,
 			Seen:        parseTime(e.MetaData.TimeUTC, now),
 		}
@@ -200,6 +206,19 @@ func (s *Source) handle(raw json.RawMessage, now time.Time) (*model.Contact, err
 		return c, nil
 	}
 	return nil, nil
+}
+
+// parseETA turns the AIS month/day/hour/minute ETA into a time in UTC. AIS sends 0/0/24/60 for "unavailable".
+// The year is not transmitted; an ETA more than a month in the past is taken to mean next year.
+func parseETA(month, day, hour, minute int, now time.Time) *time.Time {
+	if month < 1 || month > 12 || day < 1 || day > 31 || hour > 23 || minute > 59 {
+		return nil
+	}
+	t := time.Date(now.UTC().Year(), time.Month(month), day, hour, minute, 0, 0, time.UTC)
+	if t.Before(now.Add(-30 * 24 * time.Hour)) {
+		t = t.AddDate(1, 0, 0)
+	}
+	return &t
 }
 
 // parseTime handles AISStream's "2006-01-02 15:04:05.999999999 -0700 UTC" timestamps.

@@ -51,7 +51,7 @@
   <tbody>
     {#each rows as c (c.id)}
       <tr class:selected={c.id === store.selectedId} class:military={c.military} class:emergency={!!c.emergency} onclick={() => store.select(c.id)}>
-        <td>{c.kind === "vessel" ? "⛴ " : ""}{c.label}</td>
+        <td><span class="glyph">{c.kind === "vessel" ? "⛴" : "✈"}</span>{c.label}</td>
         <td>{c.type ?? ""}</td>
         <td class="num">{c.kind === "vessel" ? "" : c.on_ground ? "gnd" : fmtNum(c.alt_ft)}</td>
         <td class="num">{fmtNum(c.speed_kt)}</td>
@@ -107,6 +107,11 @@
   tr.emergency td:first-child {
     color: #ff4757;
     font-weight: 600;
+  }
+  .glyph {
+    display: inline-block;
+    width: 1.3em;
+    color: #9a9a9a;
   }
   .num {
     text-align: right;

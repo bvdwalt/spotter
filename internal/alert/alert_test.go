@@ -78,3 +78,44 @@ func TestNtfySink(t *testing.T) {
 		t.Errorf("got %q %q %q %q", gotTitle, gotPrio, gotAuth, gotBody)
 	}
 }
+
+func TestClearAndDismiss(t *testing.T) {
+	e := New(Options{Cooldown: time.Hour}, nil)
+	now := time.Unix(1_700_000_000, 0)
+	e.Observe(context.Background(), model.Contact{ID: "a:1", Squawk: "7700", Seen: now})
+	e.Observe(context.Background(), model.Contact{ID: "a:2", Military: true, Seen: now})
+	if !e.Dismiss("emergency", "a:1", now) || e.Dismiss("emergency", "a:1", now) {
+		t.Error("dismiss should succeed once")
+	}
+	if len(e.Recent()) != 1 {
+		t.Errorf("recent = %d, want 1", len(e.Recent()))
+	}
+	e.Clear()
+	if len(e.Recent()) != 0 {
+		t.Error("clear should empty recent")
+	}
+	if got := e.Observe(context.Background(), model.Contact{ID: "a:1", Squawk: "7700", Seen: now.Add(time.Minute)}); len(got) != 0 {
+		t.Error("cooldown should survive clear")
+	}
+}
+
+func TestWatchAndUnwatch(t *testing.T) {
+	e := New(Options{Cooldown: time.Hour}, nil)
+	now := time.Unix(1_700_000_000, 0)
+	c := model.Contact{ID: "v:123", Kind: model.KindVessel, Label: "S", Seen: now}
+	if got := e.Observe(context.Background(), c); len(got) != 0 {
+		t.Fatal("unwatched contact should not alert")
+	}
+	e.Watch("v:123")
+	if got := e.Observe(context.Background(), c); len(got) != 1 || got[0].Rule != "watchlist" {
+		t.Fatalf("watched contact should alert: %v", got)
+	}
+	if !e.Watching("v:123") || e.WatchList()[0] != "123" {
+		t.Errorf("watch state: %v", e.WatchList())
+	}
+	e.Unwatch("v:123")
+	e.Watch("123")
+	if got := e.Observe(context.Background(), c); len(got) != 1 {
+		t.Error("re-watching should alert again despite cooldown")
+	}
+}

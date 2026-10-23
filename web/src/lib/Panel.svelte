@@ -1,9 +1,20 @@
 <script lang="ts">
   import { store } from "./contacts.svelte";
-  import { ageText, fmtNum, navStatusText } from "./format";
-  import { iataFlight } from "./airlines";
+  import { ageText, clockText, dateTimeText, durationText, fmtNum, navStatusText } from "./format";
+  import { iataFlight, operator } from "./airlines";
+  import { haversineKm } from "./geo";
 
   const c = $derived(store.selected);
+
+  /** Aircraft only: distance left along the route and the time it takes at the current ground speed. */
+  const progress = $derived.by(() => {
+    if (!c || !c.route || !c.route.plausible) return null;
+    const toGoKm = haversineKm(c.lat, c.lon, c.route.to.lat, c.route.to.lon);
+    const totalKm = haversineKm(c.route.from.lat, c.route.from.lon, c.route.to.lat, c.route.to.lon);
+    const speedKmh = (c.speed_kt ?? 0) * 1.852;
+    const remainingMs = speedKmh > 90 ? (toGoKm / speedKmh) * 3600_000 : null;
+    return { toGoKm, totalKm, remainingMs, eta: remainingMs === null ? null : new Date(store.now + remainingMs) };
+  });
 </script>
 
 {#if c}
@@ -13,17 +24,36 @@
         <h2>{c.label}</h2>
         <span class="sub">{c.kind} · {c.source}</span>
       </div>
-      <button class="close" onclick={() => store.select(null)} aria-label="Close">×</button>
+      <div class="actions">
+        <button class="watch" class:on={store.isWatched(c.id)} onclick={() => store.toggleWatch(c.id)}>
+          {store.isWatched(c.id) ? "watching" : "watch"}
+        </button>
+        <button class="close" onclick={() => store.select(null)} aria-label="Close">×</button>
+      </div>
     </header>
     <dl>
       {#if c.kind === "aircraft"}
         {#if iataFlight(c.label)}<dt>Flight</dt><dd>{iataFlight(c.label)}</dd>{/if}
+        {#if operator(c.label)}
+          <dt>Operator</dt>
+          <dd>{operator(c.label)?.name} <span class="muted">{operator(c.label)?.iata} / {operator(c.label)?.icao}</span></dd>
+        {/if}
         {#if c.route}
           <dt>Route</dt>
           <dd class:dim={!c.route.plausible} title={c.route.plausible ? "" : "position does not fit this route"}>
             {c.route.from.iata || c.route.from.icao} → {c.route.to.iata || c.route.to.icao}
             <span class="sub">{c.route.from.name} → {c.route.to.name}</span>
           </dd>
+          {#if progress}
+            <dt>To go</dt>
+            <dd>{progress.toGoKm.toFixed(0)} km of {progress.totalKm.toFixed(0)} km</dd>
+            {#if progress.remainingMs !== null && progress.eta}
+              <dt>Remaining</dt>
+              <dd>{durationText(progress.remainingMs)} <span class="muted">at current speed</span></dd>
+              <dt>ETA</dt>
+              <dd>{clockText(progress.eta)} <span class="muted">estimated, local time</span></dd>
+            {/if}
+          {/if}
         {/if}
         <dt>Registration</dt><dd>{c.reg ?? "–"}</dd>
         <dt>Type</dt><dd>{c.type ?? "–"}{c.category ? ` (${c.category})` : ""}</dd>
@@ -34,6 +64,15 @@
         <dt>MMSI</dt><dd>{c.id.slice(2)}</dd>
         <dt>Type</dt><dd>{c.type ?? "–"}</dd>
         <dt>Destination</dt><dd>{c.destination ?? "–"}</dd>
+        {#if c.eta}
+          <dt>ETA</dt>
+          <dd>
+            {dateTimeText(c.eta)} <span class="muted">reported by ship</span>
+            {#if Date.parse(c.eta) > store.now}
+              <span class="sub">{durationText(Date.parse(c.eta) - store.now)} from now</span>
+            {/if}
+          </dd>
+        {/if}
         <dt>Status</dt><dd>{navStatusText(c.nav_status)}</dd>
       {/if}
       <dt>Speed</dt><dd>{fmtNum(c.speed_kt, " kt", 0)}</dd>
@@ -64,6 +103,29 @@
   .sub {
     font-size: 0.75rem;
     color: #9a9a9a;
+  }
+  .actions {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+  }
+  .watch {
+    background: none;
+    border: 1px solid #444;
+    border-radius: 4px;
+    color: #9a9a9a;
+    font: inherit;
+    font-size: 0.75rem;
+    padding: 0.15rem 0.5rem;
+    cursor: pointer;
+  }
+  .watch.on {
+    border-color: #4ecdc4;
+    color: #4ecdc4;
+  }
+  .muted {
+    color: #9a9a9a;
+    font-size: 0.75rem;
   }
   .close {
     background: none;
