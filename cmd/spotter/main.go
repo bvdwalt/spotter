@@ -57,7 +57,9 @@ func run(ctx context.Context, cfg *config.Config) error {
 			return fmt.Errorf("open history database: %w", err)
 		}
 		defer func() { _ = conn.Close() }()
-		hist = history.New(conn, history.DefaultOptions(cfg.HistoryInterval, cfg.HistoryRetention))
+		histOpts := history.DefaultOptions(cfg.HistoryInterval, cfg.HistoryRetention)
+		histOpts.ToleranceM = cfg.HistoryToleranceM
+		hist = history.New(conn, histOpts)
 		go func() { hist.Run(ctx); close(histDone) }()
 		slog.Info("history enabled", "path", cfg.DBPath, "retention", cfg.HistoryRetention, "track_history", cfg.TrackHistory)
 	}

@@ -2,6 +2,7 @@ package history
 
 import (
 	"context"
+	"math"
 	"path/filepath"
 	"testing"
 	"time"
@@ -29,10 +30,11 @@ func contact(id string, kind model.Kind, at time.Duration, lat, lon float64) mod
 
 func TestRecordRateLimitsMovingContact(t *testing.T) {
 	s := newTestStore(t)
-	// A plane moving about 1 km between 2 s updates for a minute: one row per 10 s.
+	// A plane zig-zagging about 1 km at every 10 s sample, reporting every 2 s for a minute: one row per 10 s.
 	for i := 0; i <= 30; i++ {
-		s.Record(contact("a:1", model.KindAircraft, time.Duration(i)*2*time.Second, -33, 18+float64(i)*0.01))
+		s.Record(contact("a:1", model.KindAircraft, time.Duration(i)*2*time.Second, -33+float64((i/5)%2)*0.01, 18+float64(i)*0.01))
 	}
+	s.releaseHeld(base.Add(time.Hour), 0)
 	if err := s.Flush(context.Background()); err != nil {
 		t.Fatal(err)
 	}
@@ -53,15 +55,15 @@ func TestRecordRateLimitsMovingContact(t *testing.T) {
 
 func TestRecordStationaryHeartbeat(t *testing.T) {
 	s := newTestStore(t)
-	// A moored ship reporting every 10 s for 12 minutes without moving: first fix plus one per 5 min.
-	for i := 0; i <= 72; i++ {
+	// A moored ship reporting every 10 s for 70 minutes without moving: first fix plus one per 30 min.
+	for i := 0; i <= 420; i++ {
 		s.Record(contact("v:1", model.KindVessel, time.Duration(i)*10*time.Second, -33.9, 18.43))
 	}
 	if err := s.Flush(context.Background()); err != nil {
 		t.Fatal(err)
 	}
 	got, _ := s.Track(context.Background(), "v:1", base.Add(-time.Hour))
-	if len(got) != 3 { // 0, 5 min, 10 min
+	if len(got) != 3 { // 0, 30 min, 60 min
 		t.Fatalf("want 3 heartbeat rows, got %d", len(got))
 	}
 }
@@ -116,5 +118,137 @@ func TestRunFlushesOnShutdown(t *testing.T) {
 	got, _ := s.Track(context.Background(), "a:1", base)
 	if len(got) != 1 {
 		t.Errorf("shutdown should flush the buffer, got %d rows", len(got))
+	}
+}
+
+// distToPathM is the distance from a point to the nearest segment of a stored path.
+func distToPathM(path []model.Position, lat, lon float64) float64 {
+	best := math.MaxFloat64
+	for i := 0; i+1 < len(path); i++ {
+		a, b := path[i], path[i+1]
+		cos := math.Cos(a.Lat * math.Pi / 180)
+		bx, by := (b.Lon-a.Lon)*cos*111195, (b.Lat-a.Lat)*111195
+		px, py := (lon-a.Lon)*cos*111195, (lat-a.Lat)*111195
+		t := 0.0
+		if l2 := bx*bx + by*by; l2 > 0 {
+			t = math.Max(0, math.Min(1, (px*bx+py*by)/l2))
+		}
+		best = math.Min(best, math.Hypot(px-t*bx, py-t*by))
+	}
+	return best
+}
+
+func TestStraightFlightKeepsOnlyHeartbeats(t *testing.T) {
+	s := newTestStore(t)
+	// 10 minutes of level flight east at about 400 kt, sampled every 10 s.
+	for i := 0; i <= 60; i++ {
+		s.Record(contact("a:1", model.KindAircraft, time.Duration(i)*10*time.Second, -33, 18+float64(i)*0.02))
+	}
+	if err := s.Flush(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	got, _ := s.Track(context.Background(), "a:1", base.Add(-time.Hour))
+	if len(got) != 3 { // t = 0, then one heartbeat per 5 minutes
+		t.Fatalf("a straight leg should store 3 rows, got %d", len(got))
+	}
+}
+
+func TestTurnKeepsItsCorner(t *testing.T) {
+	s := newTestStore(t)
+	type pt struct{ lat, lon float64 }
+	var flown []pt
+	for i := 0; i < 30; i++ { // east
+		flown = append(flown, pt{-33, 18 + float64(i)*0.02})
+	}
+	for i := 1; i <= 30; i++ { // then north
+		flown = append(flown, pt{-33 + float64(i)*0.02, 18 + 29*0.02})
+	}
+	for i, p := range flown {
+		s.Record(contact("a:1", model.KindAircraft, time.Duration(i)*10*time.Second, p.lat, p.lon))
+	}
+	s.releaseHeld(base.Add(time.Hour), 0)
+	if err := s.Flush(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	got, _ := s.Track(context.Background(), "a:1", base.Add(-time.Hour))
+	if len(got) > 5 {
+		t.Errorf("an L-shaped flight needs a handful of rows, got %d", len(got))
+	}
+	for i, p := range flown {
+		if d := distToPathM(got, p.lat, p.lon); d > 50.5 {
+			t.Fatalf("sample %d is %.0f m off the stored path, tolerance is 50 m", i, d)
+		}
+	}
+}
+
+func TestLevelOffKeepsItsAltitudeStep(t *testing.T) {
+	s := newTestStore(t)
+	for i := 0; i < 60; i++ {
+		c := contact("a:1", model.KindAircraft, time.Duration(i)*10*time.Second, -33, 18+float64(i)*0.02)
+		alt := min(i*200, 6000) // climbs 200 ft per sample, then levels at 6000 ft
+		c.AltFt = &alt
+		s.Record(c)
+	}
+	s.releaseHeld(base.Add(time.Hour), 0)
+	if err := s.Flush(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	got, _ := s.Track(context.Background(), "a:1", base.Add(-time.Hour))
+	found := false
+	for _, p := range got {
+		if p.AltFt != nil && *p.AltFt == 6000 && p.Time.Equal(base.Add(300*time.Second)) {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("the level-off at 6000 ft should be stored as a row, got %d rows", len(got))
+	}
+}
+
+func TestJitteringMooredShipStoresOnlyHeartbeats(t *testing.T) {
+	s := newTestStore(t)
+	for i := 0; i <= 420; i++ { // 70 minutes, position wobbles by about 10 m
+		lat := -33.9 + float64(i%2)*0.0001
+		s.Record(contact("v:1", model.KindVessel, time.Duration(i)*10*time.Second, lat, 18.43))
+	}
+	if err := s.Flush(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	got, _ := s.Track(context.Background(), "v:1", base.Add(-time.Hour))
+	if len(got) != 3 {
+		t.Fatalf("want 3 heartbeat rows, got %d", len(got))
+	}
+}
+
+func TestMovingContactKeepsShortHeartbeat(t *testing.T) {
+	s := newTestStore(t)
+	// Level flight for 11 minutes keeps the 5 minute heartbeat; only a still contact waits 30 minutes.
+	for i := 0; i <= 66; i++ {
+		s.Record(contact("a:1", model.KindAircraft, time.Duration(i)*10*time.Second, -33, 18+float64(i)*0.02))
+	}
+	if err := s.Flush(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	got, _ := s.Track(context.Background(), "a:1", base.Add(-time.Hour))
+	if len(got) != 3 { // 0, 5 min, 10 min
+		t.Fatalf("want 3 rows, got %d", len(got))
+	}
+}
+
+func TestIdleContactReleasesItsLastPosition(t *testing.T) {
+	s := newTestStore(t)
+	for i := 0; i <= 9; i++ { // 90 s of straight flight, then the feed goes quiet
+		s.Record(contact("a:1", model.KindAircraft, time.Duration(i)*10*time.Second, -33, 18+float64(i)*0.02))
+	}
+	s.releaseHeld(base.Add(91*time.Second), 2*time.Minute)
+	_ = s.Flush(context.Background())
+	if got, _ := s.Track(context.Background(), "a:1", base.Add(-time.Hour)); len(got) != 1 {
+		t.Fatalf("a recently seen contact keeps its held point, got %d rows", len(got))
+	}
+	s.releaseHeld(base.Add(5*time.Minute), 2*time.Minute)
+	_ = s.Flush(context.Background())
+	got, _ := s.Track(context.Background(), "a:1", base.Add(-time.Hour))
+	if len(got) != 2 || !got[1].Time.Equal(base.Add(90*time.Second)) {
+		t.Fatalf("an idle contact should store its newest position, got %+v", got)
 	}
 }

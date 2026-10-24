@@ -14,28 +14,37 @@ import (
 )
 
 type Options struct {
-	MinInterval time.Duration // at most one row per contact this often
-	Heartbeat   time.Duration // a contact that has not moved is still written this often
-	MinMoveM    float64       // below this distance a contact counts as not moved
-	FlushEvery  time.Duration
-	PruneEvery  time.Duration
-	Retention   time.Duration
+	MinInterval    time.Duration // at most one row per contact this often
+	Heartbeat      time.Duration // a contact moving in a straight line is written at least this often
+	StillHeartbeat time.Duration // a contact that has not left ToleranceM of its last row is written this often
+	ToleranceM     float64       // samples within this distance of the straight line between stored rows are dropped
+	AltToleranceFt int           // likewise for altitude against a straight climb or descent
+	Idle           time.Duration // a contact unseen this long has its newest held sample written
+	FlushEvery     time.Duration
+	PruneEvery     time.Duration
+	Retention      time.Duration
 }
 
 func DefaultOptions(minInterval, retention time.Duration) Options {
 	return Options{
-		MinInterval: minInterval,
-		Heartbeat:   5 * time.Minute,
-		MinMoveM:    50,
-		FlushEvery:  5 * time.Second,
-		PruneEvery:  10 * time.Minute,
-		Retention:   retention,
+		MinInterval:    minInterval,
+		Heartbeat:      5 * time.Minute,
+		StillHeartbeat: 30 * time.Minute,
+		ToleranceM:     50,
+		AltToleranceFt: 300,
+		Idle:           2 * time.Minute,
+		FlushEvery:     5 * time.Second,
+		PruneEvery:     10 * time.Minute,
+		Retention:      retention,
 	}
 }
 
-type fix struct {
-	ts       time.Time
-	lat, lon float64
+// tracker is what the store remembers per contact: the last row written and the samples seen since,
+// which are held back until a later sample shows they were not on a straight line.
+type tracker struct {
+	anchor model.Contact
+	held   []model.Contact
+	at     time.Time // when the newest accepted sample was seen
 }
 
 type Store struct {
@@ -43,29 +52,77 @@ type Store struct {
 	opts Options
 
 	mu   sync.Mutex
-	last map[string]fix
+	last map[string]*tracker
 	buf  []model.Contact
 }
 
 func New(db *sql.DB, opts Options) *Store {
-	return &Store{db: db, opts: opts, last: make(map[string]fix)}
+	return &Store{db: db, opts: opts, last: make(map[string]*tracker)}
 }
 
-// Record buffers a position if the contact has moved or the heartbeat is due; it never blocks on the database.
+// Record buffers a position unless it lies on the straight line between rows already stored; it never blocks on the database.
 func (s *Store) Record(c model.Contact) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if prev, ok := s.last[c.ID]; ok {
-		dt := c.Seen.Sub(prev.ts)
-		if dt < s.opts.MinInterval {
-			return
+	t, ok := s.last[c.ID]
+	if !ok {
+		s.last[c.ID] = &tracker{anchor: c, at: c.Seen}
+		s.buf = append(s.buf, c)
+		return
+	}
+	if c.Seen.Sub(t.at) < s.opts.MinInterval {
+		return
+	}
+	if len(t.held) == 0 && c.Seen.Sub(t.anchor.Seen) < s.opts.StillHeartbeat &&
+		metres(t.anchor.Lat, t.anchor.Lon, c.Lat, c.Lon) < s.opts.ToleranceM {
+		return
+	}
+	if !s.onLine(t, c) {
+		s.write(t, t.held[len(t.held)-1])
+	}
+	t.at = c.Seen
+	if c.Seen.Sub(t.anchor.Seen) >= s.opts.Heartbeat {
+		s.write(t, c)
+		return
+	}
+	t.held = append(t.held, c)
+}
+
+// onLine reports whether every held sample still lies within tolerance of the line from the anchor to c.
+func (s *Store) onLine(t *tracker, c model.Contact) bool {
+	for _, h := range t.held {
+		if offLineM(t.anchor, c, h) > s.opts.ToleranceM {
+			return false
 		}
-		if metres(prev.lat, prev.lon, c.Lat, c.Lon) < s.opts.MinMoveM && dt < s.opts.Heartbeat {
-			return
+		if t.anchor.AltFt != nil && c.AltFt != nil && h.AltFt != nil {
+			span := c.Seen.Sub(t.anchor.Seen).Seconds()
+			f := h.Seen.Sub(t.anchor.Seen).Seconds() / span
+			want := float64(*t.anchor.AltFt) + f*float64(*c.AltFt-*t.anchor.AltFt)
+			if math.Abs(float64(*h.AltFt)-want) > float64(s.opts.AltToleranceFt) {
+				return false
+			}
 		}
 	}
-	s.last[c.ID] = fix{ts: c.Seen, lat: c.Lat, lon: c.Lon}
+	return true
+}
+
+// write queues c as the contact's new stored row and drops the samples held before it.
+func (s *Store) write(t *tracker, c model.Contact) {
+	t.anchor = c
+	t.held = nil
 	s.buf = append(s.buf, c)
+}
+
+// releaseHeld writes the newest held sample of every contact unseen for at least idle, so a contact that
+// left coverage keeps its last position. An idle of zero writes them all, for shutdown.
+func (s *Store) releaseHeld(now time.Time, idle time.Duration) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, t := range s.last {
+		if len(t.held) > 0 && now.Sub(t.at) >= idle {
+			s.write(t, t.held[len(t.held)-1])
+		}
+	}
 }
 
 // Run flushes and prunes on timers until ctx is done, then flushes what is left.
@@ -81,13 +138,15 @@ func (s *Store) Run(ctx context.Context) {
 		select {
 		case <-ctx.Done():
 			// The run context is gone, so the final flush gets its own short deadline.
+			s.releaseHeld(time.Now(), 0)
 			final, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			if err := s.Flush(final); err != nil {
 				slog.Warn("history final flush failed", "err", err)
 			}
 			cancel()
 			return
-		case <-flush.C:
+		case now := <-flush.C:
+			s.releaseHeld(now, s.opts.Idle)
 			if err := s.Flush(ctx); err != nil {
 				slog.Warn("history flush failed", "err", err)
 			}
@@ -146,8 +205,8 @@ func (s *Store) Prune(ctx context.Context, now time.Time) (int64, error) {
 		return 0, err
 	}
 	s.mu.Lock()
-	for id, f := range s.last {
-		if f.ts.Before(cutoff) {
+	for id, t := range s.last {
+		if t.at.Before(cutoff) {
 			delete(s.last, id)
 		}
 	}
@@ -197,4 +256,17 @@ func metres(lat1, lon1, lat2, lon2 float64) float64 {
 	dLon := toRad(lon2 - lon1)
 	a := math.Sin(dLat/2)*math.Sin(dLat/2) + math.Cos(toRad(lat1))*math.Cos(toRad(lat2))*math.Sin(dLon/2)*math.Sin(dLon/2)
 	return 2 * r * math.Asin(math.Sqrt(a))
+}
+
+// offLineM is how far h is from the segment a to b, on a flat projection that is accurate over a few hundred km.
+func offLineM(a, b, h model.Contact) float64 {
+	const mPerDeg = 111195.0
+	cos := math.Cos(a.Lat * math.Pi / 180)
+	bx, by := (b.Lon-a.Lon)*cos*mPerDeg, (b.Lat-a.Lat)*mPerDeg
+	hx, hy := (h.Lon-a.Lon)*cos*mPerDeg, (h.Lat-a.Lat)*mPerDeg
+	t := 0.0
+	if l2 := bx*bx + by*by; l2 > 0 {
+		t = math.Max(0, math.Min(1, (hx*bx+hy*by)/l2))
+	}
+	return math.Hypot(hx-t*bx, hy-t*by)
 }
