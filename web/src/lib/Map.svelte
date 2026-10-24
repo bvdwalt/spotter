@@ -120,6 +120,42 @@
       await Promise.all(
         Object.entries(ICONS).map(async ([name, svg]) => m.addImage(name, await loadIcon(svg))),
       );
+      m.addSource("airports", { type: "geojson", data: "/airports.json" });
+      const airportLayers = [
+        { id: "airports-major", major: true, minzoom: 4, radius: 4.5, text: 11 },
+        { id: "airports-minor", major: false, minzoom: 8, radius: 3, text: 10 },
+      ];
+      for (const a of airportLayers) {
+        m.addLayer({
+          id: `${a.id}-dot`,
+          type: "circle",
+          source: "airports",
+          minzoom: a.minzoom,
+          filter: ["==", ["get", "major"], a.major],
+          paint: {
+            "circle-radius": a.radius,
+            "circle-color": "#5a6b7d",
+            "circle-stroke-color": "#fff",
+            "circle-stroke-width": 1.2,
+          },
+        });
+        m.addLayer({
+          id: `${a.id}-label`,
+          type: "symbol",
+          source: "airports",
+          minzoom: a.minzoom,
+          filter: ["==", ["get", "major"], a.major],
+          layout: {
+            "text-field": ["get", "code"],
+            "text-size": a.text,
+            "text-font": ["Noto Sans Regular"],
+            "text-offset": [0, 0.9],
+            "text-anchor": "top",
+            "text-optional": true,
+          },
+          paint: { "text-color": "#445566", "text-halo-color": "#fff", "text-halo-width": 1.2 },
+        });
+      }
       m.addSource("home", {
         type: "geojson",
         data: { type: "Feature", geometry: { type: "Point", coordinates: [cfg.home_lon, cfg.home_lat] }, properties: {} },
@@ -213,6 +249,18 @@
   $effect(() => {
     if (!ready || !map) return;
     (map.getSource("route") as GeoJSONSource | undefined)?.setData(routeGeoJSON());
+  });
+
+  $effect(() => {
+    if (!ready || !map) return;
+    const mode = store.airports;
+    const show = (id: string, on: boolean) => {
+      for (const part of ["dot", "label"]) {
+        map?.setLayoutProperty(`${id}-${part}`, "visibility", on ? "visible" : "none");
+      }
+    };
+    show("airports-major", mode !== "off");
+    show("airports-minor", mode === "all");
   });
 
   // Follow: re-centre on the selected contact whenever its position changes.

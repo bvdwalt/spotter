@@ -1,6 +1,19 @@
 import { api, type Alert, type ClientConfig, type Contact, type Kind, type Position, type Status } from "./api";
 import { searchTerms } from "./airlines";
 
+export type AirportMode = "off" | "major" | "all";
+const AIRPORT_PREF = "spotter.airports";
+
+function loadAirportMode(): AirportMode {
+  try {
+    const v = localStorage.getItem(AIRPORT_PREF);
+    if (v === "off" || v === "major" || v === "all") return v;
+  } catch {
+    // storage can be unavailable in private windows; fall back to the default
+  }
+  return "major";
+}
+
 class ContactStore {
   config = $state<ClientConfig | null>(null);
   contacts = $state<Contact[]>([]);
@@ -11,6 +24,20 @@ class ContactStore {
   track = $state<Position[]>([]);
   hideGround = $state(true);
   follow = $state(false);
+  #airports = $state<AirportMode>(loadAirportMode());
+
+  get airports(): AirportMode {
+    return this.#airports;
+  }
+
+  set airports(mode: AirportMode) {
+    this.#airports = mode;
+    try {
+      localStorage.setItem(AIRPORT_PREF, mode);
+    } catch {
+      // not persisted; the choice still applies for this page load
+    }
+  }
   kind = $state<"all" | Kind>("all");
   query = $state("");
   error = $state<string | null>(null);

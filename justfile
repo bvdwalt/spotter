@@ -44,6 +44,10 @@ basemap bbox="15,-36,34,-21" maxzoom="12":
     go-pmtiles extract "https://build.protomaps.com/${build}.pmtiles" data/basemap.pmtiles --bbox={{bbox}} --maxzoom={{maxzoom}}
     ls -lh data/basemap.pmtiles
 
+# Regenerate web/public/airports.json from OurAirports for a lonW,latS,lonE,latN box
+airports bbox="15,-36,34,-21":
+    go run ./tools/airports -bbox={{bbox}} -out web/public/airports.json
+
 # Run Go on :8080 with hot reload (air) and Vite on :5173, with vars from .env; Ctrl-C stops both
 dev: web-install
     #!/usr/bin/env bash

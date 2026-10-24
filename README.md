@@ -76,6 +76,14 @@ BASEMAP_PMTILES=data/basemap.pmtiles just dev
 `just basemap "lonW,latS,lonE,latN" 13` changes the region or detail. Fonts and
 sprites for the Protomaps light style are bundled under `web/public/basemap`.
 
+## Airports
+
+The toolbar shows airports from [OurAirports](https://ourairports.com/data/)
+(public domain): off, major (large airports and medium ones named International),
+or all, which adds smaller airfields from zoom 8. The data in
+`web/public/airports.json` covers southern Africa; regenerate it for another
+area with `just airports "lonW,latS,lonE,latN"`.
+
 ## Alerts
 
 Three rules, evaluated on every update: emergency squawks (7500, 7600, 7700),
@@ -91,4 +99,5 @@ title, tags, and high priority for emergencies.
 Map tiles come from [OpenFreeMap](https://openfreemap.org). Aircraft data from
 [adsb.fi](https://adsb.fi) (non-commercial, attribution required), ship data from [AISStream](https://aisstream.io),
 routes from the [adsb.im](https://adsb.im) route database, aircraft photos from
-[planespotters.net](https://www.planespotters.net/photo/api).
+[planespotters.net](https://www.planespotters.net/photo/api), airports from
+[OurAirports](https://ourairports.com/data/).

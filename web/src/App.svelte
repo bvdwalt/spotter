@@ -32,6 +32,14 @@
         <option value="vessel">vessels</option>
       </select>
       <label><input type="checkbox" bind:checked={store.hideGround} /> hide ground</label>
+      <label>
+        airports
+        <select bind:value={store.airports}>
+          <option value="off">off</option>
+          <option value="major">major</option>
+          <option value="all">all</option>
+        </select>
+      </label>
     </div>
     <div class="status" class:bad={anyBad || !!store.error}>
       {#if store.error}
