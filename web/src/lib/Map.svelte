@@ -1,12 +1,17 @@
 <script lang="ts">
-  import maplibregl, { type GeoJSONSource, type StyleSpecification } from "maplibre-gl";
+  import * as maplibregl from "maplibre-gl";
+  import type { GeoJSONSource, StyleSpecification } from "maplibre-gl";
   import "maplibre-gl/dist/maplibre-gl.css";
+  import workerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url";
   import { Protocol } from "pmtiles";
   import { layers as basemapLayers, namedFlavor } from "@protomaps/basemaps";
   import type { Contact } from "./api";
   import { ICONS, loadIcon } from "./icons";
   import { store } from "./contacts.svelte";
   import { greatCircle } from "./geo";
+
+  // MapLibre 6 cannot find its worker inside a bundle, so Vite emits it and we point MapLibre at it.
+  maplibregl.setWorkerUrl(workerUrl);
 
   const OPENFREEMAP_STYLE = "https://tiles.openfreemap.org/styles/positron";
 
