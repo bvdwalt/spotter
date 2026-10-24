@@ -1,4 +1,4 @@
-// Package adsb polls a readsb-style aggregator (adsb.lol, airplanes.live) for aircraft near a point.
+// Package adsb polls a readsb-style aggregator (adsb.fi, adsb.lol) for aircraft within one or more circles.
 package adsb
 
 import (
@@ -10,6 +10,7 @@ import (
 	"math"
 	"net/http"
 	"net/url"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -19,7 +20,9 @@ import (
 )
 
 const (
-	maxBackoff      = 60 * time.Second
+	maxBackoff = 60 * time.Second
+	// circleSpacing keeps consecutive circle queries under adsb.fi's one request per second.
+	circleSpacing   = 1100 * time.Millisecond
 	maxRetryAfter   = 10 * time.Minute
 	defaultRetry429 = 30 * time.Second
 )
@@ -33,26 +36,25 @@ func (e RateLimitedError) Error() string {
 
 type Source struct {
 	BaseURL  string
-	Lat, Lon float64
-	RadiusNM float64
+	Circles  []model.Circle
 	Interval time.Duration
+	Spacing  time.Duration // pause between circle queries within one poll
 	Client   *http.Client
 
 	mu     sync.Mutex
 	status model.SourceStatus
 }
 
-func New(baseURL string, lat, lon, radiusNM float64, interval time.Duration) *Source {
+func New(baseURL string, circles []model.Circle, interval time.Duration) *Source {
 	name := baseURL
 	if u, err := url.Parse(baseURL); err == nil && u.Host != "" {
 		name = u.Host
 	}
 	return &Source{
 		BaseURL:  strings.TrimRight(baseURL, "/"),
-		Lat:      lat,
-		Lon:      lon,
-		RadiusNM: radiusNM,
+		Circles:  circles,
 		Interval: interval,
+		Spacing:  circleSpacing,
 		Client:   &http.Client{Timeout: 15 * time.Second},
 		status:   model.SourceStatus{Name: name, Enabled: true},
 	}
@@ -102,8 +104,44 @@ func (s *Source) Run(ctx context.Context, out chan<- model.Contact) error {
 	}
 }
 
+// Poll queries every circle in turn and merges the results by aircraft, keeping the freshest position.
+// A local aircraft.json is fetched once and filtered to the circles instead.
 func (s *Source) Poll(ctx context.Context) ([]model.Contact, error) {
-	u := s.pointURL()
+	if s.isLocalFile() {
+		contacts, err := s.fetch(ctx, s.BaseURL)
+		if err != nil {
+			return nil, err
+		}
+		return s.withinCircles(contacts), nil
+	}
+	byID := map[string]model.Contact{}
+	for i, c := range s.Circles {
+		if i > 0 && s.Spacing > 0 {
+			select {
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			case <-time.After(s.Spacing):
+			}
+		}
+		contacts, err := s.fetch(ctx, s.pointURL(c))
+		if err != nil {
+			return nil, err
+		}
+		for _, ct := range contacts {
+			if prev, ok := byID[ct.ID]; !ok || ct.Seen.After(prev.Seen) {
+				byID[ct.ID] = ct
+			}
+		}
+	}
+	out := make([]model.Contact, 0, len(byID))
+	for _, ct := range byID {
+		out = append(out, ct)
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
+	return out, nil
+}
+
+func (s *Source) fetch(ctx context.Context, u string) ([]model.Contact, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
 	if err != nil {
 		return nil, err
@@ -120,14 +158,7 @@ func (s *Source) Poll(ctx context.Context) ([]model.Contact, error) {
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("unexpected status %d", resp.StatusCode)
 	}
-	contacts, err := Parse(json.NewDecoder(resp.Body), s.Name(), time.Now())
-	if err != nil {
-		return nil, err
-	}
-	if s.isLocalFile() {
-		contacts = s.withinRadius(contacts)
-	}
-	return contacts, nil
+	return Parse(json.NewDecoder(resp.Body), s.Name(), time.Now())
 }
 
 // isLocalFile reports whether BaseURL points straight at a readsb/tar1090 aircraft.json,
@@ -136,11 +167,14 @@ func (s *Source) isLocalFile() bool {
 	return strings.HasSuffix(s.BaseURL, ".json")
 }
 
-func (s *Source) withinRadius(contacts []model.Contact) []model.Contact {
+func (s *Source) withinCircles(contacts []model.Contact) []model.Contact {
 	out := contacts[:0]
-	for _, c := range contacts {
-		if haversineNM(s.Lat, s.Lon, c.Lat, c.Lon) <= s.RadiusNM {
-			out = append(out, c)
+	for _, ct := range contacts {
+		for _, c := range s.Circles {
+			if haversineNM(c.Lat, c.Lon, ct.Lat, ct.Lon) <= c.RadiusNM {
+				out = append(out, ct)
+				break
+			}
 		}
 	}
 	return out
@@ -165,16 +199,13 @@ func retryAfter(h http.Header, fallback time.Duration) time.Duration {
 	return fallback
 }
 
-// pointURL builds the point query. adsb.fi uses a different path from the readsb-style aggregators.
-func (s *Source) pointURL() string {
-	if s.isLocalFile() {
-		return s.BaseURL
-	}
-	radius := int(math.Round(s.RadiusNM))
+// pointURL builds the query for one circle. adsb.fi uses a different path from the readsb-style aggregators.
+func (s *Source) pointURL(c model.Circle) string {
+	radius := int(math.Round(c.RadiusNM))
 	if strings.Contains(s.BaseURL, "adsb.fi") {
-		return fmt.Sprintf("%s/lat/%s/lon/%s/dist/%d", s.BaseURL, fmtCoord(s.Lat), fmtCoord(s.Lon), radius)
+		return fmt.Sprintf("%s/lat/%s/lon/%s/dist/%d", s.BaseURL, fmtCoord(c.Lat), fmtCoord(c.Lon), radius)
 	}
-	return fmt.Sprintf("%s/point/%s/%s/%d", s.BaseURL, fmtCoord(s.Lat), fmtCoord(s.Lon), radius)
+	return fmt.Sprintf("%s/point/%s/%s/%d", s.BaseURL, fmtCoord(c.Lat), fmtCoord(c.Lon), radius)
 }
 
 func fmtCoord(f float64) string { return fmt.Sprintf("%.4f", f) }

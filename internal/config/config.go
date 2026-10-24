@@ -7,7 +7,11 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/bvdwalt/spotter/internal/model"
 )
+
+const maxADSBPoints = 5
 
 type Config struct {
 	Port             string
@@ -15,6 +19,7 @@ type Config struct {
 	HomeLon          float64
 	RadiusNM         float64
 	ADSBBaseURL      string
+	ADSBPoints       []model.Circle // query circles; defaults to one around home with RadiusNM
 	ADSBPollInterval time.Duration
 	AISStreamAPIKey  string
 	AISBBox          [2][2]float64 // [[latSW, lonSW], [latNE, lonNE]]
@@ -58,6 +63,9 @@ func Load() (*Config, error) {
 	if cfg.RadiusNM <= 0 || cfg.RadiusNM > 250 {
 		return nil, fmt.Errorf("RADIUS_NM must be between 1 and 250, got %v", cfg.RadiusNM)
 	}
+	if cfg.ADSBPoints, err = pointsEnv("ADSB_POINTS", model.Circle{Lat: cfg.HomeLat, Lon: cfg.HomeLon, RadiusNM: cfg.RadiusNM}); err != nil {
+		return nil, err
+	}
 	durations := []struct {
 		dst *time.Duration
 		key string
@@ -84,6 +92,48 @@ func Load() (*Config, error) {
 		return nil, err
 	}
 	return cfg, nil
+}
+
+// pointsEnv parses "lat,lon,nm;lat,lon,nm" into query circles, or returns the single default circle when unset.
+func pointsEnv(key string, def model.Circle) ([]model.Circle, error) {
+	v := strings.TrimSpace(os.Getenv(key))
+	if v == "" {
+		return []model.Circle{def}, nil
+	}
+	var out []model.Circle
+	for _, part := range strings.Split(v, ";") {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+		fields := strings.Split(part, ",")
+		if len(fields) != 3 {
+			return nil, fmt.Errorf("%s: %q must be lat,lon,nm", key, part)
+		}
+		var n [3]float64
+		for i, f := range fields {
+			x, err := strconv.ParseFloat(strings.TrimSpace(f), 64)
+			if err != nil {
+				return nil, fmt.Errorf("%s: %q: %w", key, part, err)
+			}
+			n[i] = x
+		}
+		c := model.Circle{Lat: n[0], Lon: n[1], RadiusNM: n[2]}
+		switch {
+		case c.Lat < -90 || c.Lat > 90 || c.Lon < -180 || c.Lon > 180:
+			return nil, fmt.Errorf("%s: %q is not a valid position", key, part)
+		case c.RadiusNM <= 0 || c.RadiusNM > 250:
+			return nil, fmt.Errorf("%s: %q radius must be between 1 and 250 nm", key, part)
+		}
+		out = append(out, c)
+	}
+	if len(out) == 0 {
+		return []model.Circle{def}, nil
+	}
+	if len(out) > maxADSBPoints {
+		return nil, fmt.Errorf("%s: at most %d circles, got %d", key, maxADSBPoints, len(out))
+	}
+	return out, nil
 }
 
 // bboxEnv parses "latSW,lonSW,latNE,lonNE" or derives a box spanning the radius around home.

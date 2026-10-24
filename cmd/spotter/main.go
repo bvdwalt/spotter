@@ -40,7 +40,8 @@ func run(ctx context.Context, cfg *config.Config) error {
 	}
 	alerts := alert.New(alert.Options{WatchList: cfg.WatchList, Cooldown: cfg.AlertCooldown}, sink)
 
-	adsbSource := adsb.New(cfg.ADSBBaseURL, cfg.HomeLat, cfg.HomeLon, cfg.RadiusNM, cfg.ADSBPollInterval)
+	adsbSource := adsb.New(cfg.ADSBBaseURL, cfg.ADSBPoints, cfg.ADSBPollInterval)
+	slog.Info("adsb circles", "count", len(cfg.ADSBPoints), "circles", cfg.ADSBPoints)
 	sources := []model.StatusReporter{adsbSource}
 
 	updates := make(chan model.Contact, 256)

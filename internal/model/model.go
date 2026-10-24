@@ -18,6 +18,13 @@ type Position struct {
 	Time       time.Time `json:"time"`
 }
 
+// Circle is one ADS-B point query: everything within RadiusNM of Lat/Lon.
+type Circle struct {
+	Lat      float64 `json:"lat"`
+	Lon      float64 `json:"lon"`
+	RadiusNM float64 `json:"radius_nm"`
+}
+
 type Airport struct {
 	IATA string  `json:"iata"`
 	ICAO string  `json:"icao"`

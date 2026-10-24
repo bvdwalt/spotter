@@ -32,6 +32,7 @@ docker run -p 8080:8080 -e HOME_LAT=-26.2 -e HOME_LON=28.05 spotter
 | `HOME_LAT`, `HOME_LON` | required | centre of the region |
 | `RADIUS_NM` | `150` | aircraft query radius, max 250 |
 | `ADSB_BASE_URL` | `https://opendata.adsb.fi/api/v2` | `https://api.adsb.lol/v2` also works (500 requests a day); a local receiver's `http://host/data/aircraft.json` is filtered to the radius |
+| `ADSB_POINTS` | one circle around home with `RADIUS_NM` | up to 5 query circles as `lat,lon,nm;lat,lon,nm`, each at most 250 nm, merged by aircraft |
 | `ADSB_POLL_INTERVAL` | `5s` | adsb.fi allows one request per second |
 | `AISSTREAM_API_KEY` | empty | from [aisstream.io](https://aisstream.io); ships disabled when empty |
 | `AIS_BBOX` | derived from home and radius | `latSW,lonSW,latNE,lonNE`, for example a coastal box when home is inland |
@@ -61,6 +62,20 @@ docker run -p 8080:8080 -e HOME_LAT=-26.2 -e HOME_LON=28.05 spotter
 | `GET /api/status` | per-source health and contact counts |
 | `GET /api/alerts` | recent alerts, newest first |
 | `GET /api/config` | home point, radius, expiry values for the UI |
+
+## Wider coverage
+
+The aggregators cap one query at 250 nm, so a long corridor needs several
+circles. `ADSB_POINTS` replaces the single home circle; each poll queries the
+circles about a second apart and merges aircraft seen in more than one. For the
+Cape Town to Johannesburg route (686 nm):
+
+```bash
+ADSB_POINTS="-32.08,21.16,200;-28.16,25.97,200"
+```
+
+Each circle is one request per poll, which counts against the provider's rate
+limit (adsb.fi allows one a second, adsb.lol 500 a day).
 
 ## Self-hosted basemap
 
