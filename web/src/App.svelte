@@ -2,7 +2,7 @@
   import Map from "./lib/Map.svelte";
   import Panel from "./lib/Panel.svelte";
   import Alerts from "./lib/Alerts.svelte";
-  import Table from "./lib/Table.svelte";
+  import ContactList from "./lib/ContactList.svelte";
   import Filters from "./lib/Filters.svelte";
   import { store } from "./lib/contacts.svelte";
   import { ageText } from "./lib/format";
@@ -57,7 +57,7 @@
     <Alerts />
     <Panel />
     <div class="table-wrap">
-      <Table />
+      <ContactList />
     </div>
   </aside>
 </div>
