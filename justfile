@@ -3,6 +3,7 @@ BINARY_PATH := "./" + BINARY_NAME
 CMD_PATH := "./cmd/" + BINARY_NAME
 VERSION := `git describe --tags --always --dirty 2>/dev/null || echo "dev"`
 BUILD_FLAGS := "-ldflags \"-X main.version=" + VERSION + "\""
+AIR_VERSION := "v1.67.4"
 
 build: web-build
     @echo "Building {{BINARY_NAME}}..."
@@ -43,12 +44,15 @@ basemap bbox="15,-36,34,-21" maxzoom="12":
     go-pmtiles extract "https://build.protomaps.com/${build}.pmtiles" data/basemap.pmtiles --bbox={{bbox}} --maxzoom={{maxzoom}}
     ls -lh data/basemap.pmtiles
 
-# Run the Go backend on :8080 with vars from .env (run `just web-dev` alongside for Vite on :5173)
-dev:
+# Run Go on :8080 with hot reload (air) and Vite on :5173, with vars from .env; Ctrl-C stops both
+dev: web-install
     #!/usr/bin/env bash
     set -euo pipefail
+    trap 'kill 0' EXIT INT TERM
     set -a; [ -f .env ] && source .env; set +a
-    go run {{BUILD_FLAGS}} {{CMD_PATH}}
+    go run github.com/air-verse/air@{{AIR_VERSION}} &
+    (cd web && npm run dev) &
+    wait
 
 docker:
     @docker build -t {{BINARY_NAME}} .

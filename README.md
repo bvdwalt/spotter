@@ -8,9 +8,14 @@ beyond the ADS-B aggregator and the browser's map tiles.
 
 ```bash
 cp .env.example .env   # set HOME_LAT / HOME_LON
-just dev               # Go backend on :8080
-just web-dev           # Vite on :5173, proxies /api to :8080
+just dev               # Go on :8080 with hot reload, Vite on :5173; open http://localhost:5173
 ```
+
+Go changes under `cmd/` and `internal/` rebuild and restart through
+[air](https://github.com/air-verse/air), frontend changes reload in the browser
+through Vite. Running locally while a deployed instance polls adsb.fi from the
+same public IP shares its one-request-per-second limit; set
+`ADSB_BASE_URL=https://api.adsb.lol/v2` in `.env` to avoid that.
 
 Or with Docker:
 
