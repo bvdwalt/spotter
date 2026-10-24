@@ -3,8 +3,22 @@
   line-height: 1.5;
   font-weight: 400;
   color-scheme: dark;
-  color: #e0e0e0;
-  background-color: #121212;
+  color: var(--text);
+  background-color: var(--bg-0);
+
+  --bg-0: #121212;
+  --bg-1: #1b1b1b;
+  --bg-2: #242424;
+  --line: #2a2a2a;
+  --line-strong: #3a3a3a;
+  --text: #e0e0e0;
+  --muted: #9a9a9a;
+  --accent: #4ecdc4;
+  --accent-dim: #163b38;
+  --warn: #ff9f43;
+  --danger: #ff4757;
+  --ok: #7cd992;
+  --radius: 6px;
 }
 
 * {
@@ -21,5 +35,16 @@
 body {
   margin: 0;
   min-height: 100vh;
-  background-color: #121212;
+  background-color: var(--bg-0);
+}
+
+button,
+input,
+select {
+  font: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
