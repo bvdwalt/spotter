@@ -155,3 +155,51 @@ func TestMetrics(t *testing.T) {
 		t.Errorf("content type %q", ct)
 	}
 }
+
+type fakeHistory struct {
+	rows map[string][]model.Position
+	err  error
+}
+
+func (f fakeHistory) Track(_ context.Context, id string, _ time.Time) ([]model.Position, error) {
+	return f.rows[id], f.err
+}
+
+func trackLen(t *testing.T, h http.Handler, path string) (int, int) {
+	t.Helper()
+	code, body := get(t, h, path)
+	if code != 200 {
+		return code, 0
+	}
+	return code, len(body["positions"].([]any))
+}
+
+func TestTrackFromHistory(t *testing.T) {
+	now := time.Now()
+	store := track.New(track.Options{AircraftExpiry: time.Minute, VesselExpiry: time.Minute, TrackWindow: time.Hour, TrackMinInterval: time.Second})
+	store.Upsert(model.Contact{ID: "a:1", Kind: model.KindAircraft, Seen: now.Add(-2 * time.Second)})
+	store.Upsert(model.Contact{ID: "a:1", Kind: model.KindAircraft, Seen: now})
+	hist := fakeHistory{rows: map[string][]model.Position{
+		"a:1":    {{Time: now.Add(-2 * time.Hour)}, {Time: now.Add(-time.Hour)}, {Time: now.Add(-2 * time.Second)}},
+		"a:gone": {{Time: now.Add(-3 * time.Hour)}},
+	}}
+	h := New(Deps{Store: store, Alerts: alert.New(alert.Options{}, nil), History: hist, TrackHistory: 6 * time.Hour})
+
+	// Three stored rows plus the one live point newer than the last stored row.
+	if code, n := trackLen(t, h, "/api/contacts/a:1/track"); code != 200 || n != 4 {
+		t.Errorf("a:1: code %d, %d positions, want 200 and 4", code, n)
+	}
+	// A contact that has expired from memory still has its stored path.
+	if code, n := trackLen(t, h, "/api/contacts/a:gone/track"); code != 200 || n != 1 {
+		t.Errorf("a:gone: code %d, %d positions, want 200 and 1", code, n)
+	}
+	if code, _ := trackLen(t, h, "/api/contacts/a:none/track"); code != 404 {
+		t.Errorf("unknown contact: code %d, want 404", code)
+	}
+
+	// A failing database falls back to the in-memory track.
+	broken := New(Deps{Store: store, Alerts: alert.New(alert.Options{}, nil), History: fakeHistory{err: context.DeadlineExceeded}, TrackHistory: time.Hour})
+	if code, n := trackLen(t, broken, "/api/contacts/a:1/track"); code != 200 || n != 2 {
+		t.Errorf("fallback: code %d, %d positions, want 200 and 2", code, n)
+	}
+}

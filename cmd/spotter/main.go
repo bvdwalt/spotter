@@ -13,6 +13,8 @@ import (
 
 	"github.com/bvdwalt/spotter/internal/alert"
 	"github.com/bvdwalt/spotter/internal/config"
+	"github.com/bvdwalt/spotter/internal/db"
+	"github.com/bvdwalt/spotter/internal/history"
 	"github.com/bvdwalt/spotter/internal/model"
 	"github.com/bvdwalt/spotter/internal/photo"
 	"github.com/bvdwalt/spotter/internal/route"
@@ -44,6 +46,22 @@ func run(ctx context.Context, cfg *config.Config) error {
 	slog.Info("adsb circles", "count", len(cfg.ADSBPoints), "circles", cfg.ADSBPoints)
 	sources := []model.StatusReporter{adsbSource}
 
+	var hist *history.Store
+	histDone := make(chan struct{})
+	if cfg.DBPath == "" {
+		close(histDone)
+		slog.Info("DB_PATH not set, tracks kept in memory only")
+	} else {
+		conn, err := db.Connect(cfg.DBPath)
+		if err != nil {
+			return fmt.Errorf("open history database: %w", err)
+		}
+		defer func() { _ = conn.Close() }()
+		hist = history.New(conn, history.DefaultOptions(cfg.HistoryInterval, cfg.HistoryRetention))
+		go func() { hist.Run(ctx); close(histDone) }()
+		slog.Info("history enabled", "path", cfg.DBPath, "retention", cfg.HistoryRetention, "track_history", cfg.TrackHistory)
+	}
+
 	updates := make(chan model.Contact, 256)
 	go func() {
 		if err := adsbSource.Run(ctx, updates); err != nil {
@@ -71,6 +89,9 @@ func run(ctx context.Context, cfg *config.Config) error {
 				return
 			case c := <-updates:
 				stored := store.Upsert(c)
+				if hist != nil {
+					hist.Record(stored)
+				}
 				for _, a := range alerts.Observe(ctx, stored) {
 					slog.Info("alert", "rule", a.Rule, "contact", a.ContactID, "title", a.Title)
 				}
@@ -94,12 +115,14 @@ func run(ctx context.Context, cfg *config.Config) error {
 	srv := &http.Server{
 		Addr: ":" + cfg.Port,
 		Handler: server.New(server.Deps{
-			Store:   store,
-			Alerts:  alerts,
-			Photos:  photos,
-			PMTiles: cfg.BasemapPMTiles,
-			Sources: sources,
-			Version: version,
+			Store:        store,
+			Alerts:       alerts,
+			Photos:       photos,
+			History:      historyReader(hist),
+			TrackHistory: cfg.TrackHistory,
+			PMTiles:      cfg.BasemapPMTiles,
+			Sources:      sources,
+			Version:      version,
 			Config: server.ClientConfig{
 				HomeLat: cfg.HomeLat, HomeLon: cfg.HomeLon, RadiusNM: cfg.RadiusNM,
 				AircraftExpiryS: cfg.AircraftExpiry.Seconds(),
@@ -130,7 +153,17 @@ func run(ctx context.Context, cfg *config.Config) error {
 	slog.Info("shutting down")
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	return srv.Shutdown(shutdownCtx)
+	err := srv.Shutdown(shutdownCtx)
+	<-histDone // the final history flush runs on context cancellation
+	return err
+}
+
+// historyReader keeps a nil *history.Store from becoming a non-nil interface.
+func historyReader(h *history.Store) server.HistoryReader {
+	if h == nil {
+		return nil
+	}
+	return h
 }
 
 // basemapURL carries the file's mtime so browsers refetch a replaced extract despite long caching.

@@ -43,6 +43,10 @@ docker run -p 8080:8080 -e HOME_LAT=-26.2 -e HOME_LON=28.05 spotter
 | `ROUTE_API_URL` | `https://adsb.im/api/0/routeset` | route lookup by callsign; empty disables |
 | `BASEMAP_PMTILES` | empty | path to a Protomaps PMTiles extract; empty uses OpenFreeMap tiles |
 | `PHOTO_API_URL` | `https://api.planespotters.net/pub/photos/hex` | aircraft photos; empty disables |
+| `DB_PATH` | empty | SQLite file for position history; empty keeps 15 min tracks in memory only |
+| `HISTORY_RETENTION` | `72h` | stored positions older than this are deleted |
+| `HISTORY_MIN_INTERVAL` | `10s` | at most one stored row per contact this often |
+| `TRACK_HISTORY` | `6h` | how much stored path a selected contact shows |
 | `NTFY_URL` | empty | ntfy topic URL for alerts; empty keeps alerts in the UI only |
 | `NTFY_TOKEN` | empty | bearer token for ntfy, if the topic needs one |
 | `WATCH_LIST` | empty | comma-separated ICAO hex codes and MMSIs to alert on |
@@ -62,6 +66,15 @@ docker run -p 8080:8080 -e HOME_LAT=-26.2 -e HOME_LON=28.05 spotter
 | `GET /api/status` | per-source health and contact counts |
 | `GET /api/alerts` | recent alerts, newest first |
 | `GET /api/config` | home point, radius, expiry values for the UI |
+
+## History
+
+With `DB_PATH` set, positions are written to SQLite so a selected contact's path
+covers the last `TRACK_HISTORY`, survives restarts, and spans gaps where a plane
+left coverage. Moving contacts are stored at most every `HISTORY_MIN_INTERVAL`;
+contacts that have not moved about 50 m are stored every 5 minutes, so moored
+ships do not fill the table. Rows are written in batches every 5 seconds and
+pruned every 10 minutes. Expect roughly 80 MB a day for about 90 contacts.
 
 ## Wider coverage
 

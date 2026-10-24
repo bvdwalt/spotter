@@ -3,6 +3,7 @@ package server
 import (
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"sort"
@@ -35,8 +36,23 @@ func (h *handlers) track(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "bad contact id"})
 		return
 	}
-	positions, ok := h.Store.Track(id)
-	if !ok {
+	positions, live := h.Store.Track(id)
+	if h.History != nil {
+		stored, err := h.History.Track(r.Context(), id, time.Now().Add(-h.TrackHistory))
+		if err != nil {
+			slog.Warn("history track read failed", "id", id, "err", err)
+		} else if len(stored) > 0 {
+			// Stored rows lag the live track by up to one flush, so add the newer in-memory points.
+			last := stored[len(stored)-1].Time
+			for _, p := range positions {
+				if p.Time.After(last) {
+					stored = append(stored, p)
+				}
+			}
+			positions, live = stored, true
+		}
+	}
+	if !live {
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": "unknown contact"})
 		return
 	}

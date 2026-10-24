@@ -33,6 +33,10 @@ type Config struct {
 	AircraftExpiry   time.Duration
 	VesselExpiry     time.Duration
 	TrackWindow      time.Duration
+	DBPath           string // empty keeps tracks in memory only
+	HistoryRetention time.Duration
+	HistoryInterval  time.Duration
+	TrackHistory     time.Duration // how much stored path the track endpoint returns
 	TrackMinInterval time.Duration
 }
 
@@ -45,6 +49,7 @@ func Load() (*Config, error) {
 		PhotoAPIURL:     getEnv("PHOTO_API_URL", "https://api.planespotters.net/pub/photos/hex"),
 		BasemapPMTiles:  os.Getenv("BASEMAP_PMTILES"),
 		NtfyURL:         os.Getenv("NTFY_URL"),
+		DBPath:          os.Getenv("DB_PATH"),
 		NtfyToken:       os.Getenv("NTFY_TOKEN"),
 	}
 	if v := os.Getenv("WATCH_LIST"); v != "" {
@@ -77,6 +82,9 @@ func Load() (*Config, error) {
 		{&cfg.TrackWindow, "TRACK_WINDOW", 15 * time.Minute},
 		{&cfg.TrackMinInterval, "TRACK_MIN_INTERVAL", 10 * time.Second},
 		{&cfg.AlertCooldown, "ALERT_COOLDOWN", time.Hour},
+		{&cfg.HistoryRetention, "HISTORY_RETENTION", 72 * time.Hour},
+		{&cfg.HistoryInterval, "HISTORY_MIN_INTERVAL", 10 * time.Second},
+		{&cfg.TrackHistory, "TRACK_HISTORY", 6 * time.Hour},
 	}
 	for _, d := range durations {
 		if *d.dst, err = durationEnv(d.key, d.def); err != nil {

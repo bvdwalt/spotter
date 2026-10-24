@@ -1,10 +1,12 @@
 package server
 
 import (
+	"context"
 	"io/fs"
 	"log/slog"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/bvdwalt/spotter/internal/alert"
 	"github.com/bvdwalt/spotter/internal/model"
@@ -26,14 +28,21 @@ type ClientConfig struct {
 	BasemapURL      string  `json:"basemap_url,omitempty"` // set when a local PMTiles basemap is served
 }
 
+// HistoryReader serves stored paths; nil means tracks come from memory only.
+type HistoryReader interface {
+	Track(ctx context.Context, id string, since time.Time) ([]model.Position, error)
+}
+
 type Deps struct {
-	Store   *track.Store
-	Alerts  *alert.Engine
-	Photos  *photo.Client // nil disables /photo
-	PMTiles string        // path to a PMTiles file; empty disables /basemap.pmtiles
-	Sources []model.StatusReporter
-	Config  ClientConfig
-	Version string
+	Store        *track.Store
+	History      HistoryReader
+	TrackHistory time.Duration
+	Alerts       *alert.Engine
+	Photos       *photo.Client // nil disables /photo
+	PMTiles      string        // path to a PMTiles file; empty disables /basemap.pmtiles
+	Sources      []model.StatusReporter
+	Config       ClientConfig
+	Version      string
 }
 
 func New(d Deps) http.Handler {
