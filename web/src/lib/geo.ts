@@ -32,3 +32,22 @@ export function haversineKm(lat1: number, lon1: number, lat2: number, lon2: numb
   const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
   return 2 * 6371 * Math.asin(Math.sqrt(a));
 }
+
+const EARTH_RADIUS_NM = 3440.065;
+
+/** Closed ring of [lon, lat] points forming a geodesic circle of radiusNm around a centre. */
+export function circleRing(lat: number, lon: number, radiusNm: number, steps = 96): [number, number][] {
+  const toRad = (d: number) => (d * Math.PI) / 180;
+  const toDeg = (r: number) => (r * 180) / Math.PI;
+  const d = radiusNm / EARTH_RADIUS_NM;
+  const [la, lo] = [toRad(lat), toRad(lon)];
+  const ring: [number, number][] = [];
+  for (let i = 0; i < steps; i++) {
+    const b = (2 * Math.PI * i) / steps;
+    const lat2 = Math.asin(Math.sin(la) * Math.cos(d) + Math.cos(la) * Math.sin(d) * Math.cos(b));
+    const lon2 = lo + Math.atan2(Math.sin(b) * Math.sin(d) * Math.cos(la), Math.cos(d) - Math.sin(la) * Math.sin(lat2));
+    ring.push([toDeg(lon2), toDeg(lat2)]);
+  }
+  ring.push(ring[0]);
+  return ring;
+}

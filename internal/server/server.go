@@ -26,6 +26,8 @@ type ClientConfig struct {
 	TrackWindowS    float64 `json:"track_window_s"`
 	PollIntervalS   float64 `json:"poll_interval_s"`
 	BasemapURL      string  `json:"basemap_url,omitempty"` // set when a local PMTiles basemap is served
+	ADSBCircles     []model.Circle `json:"adsb_circles"`
+	AISBBox         *[2][2]float64 `json:"ais_bbox,omitempty"` // [[latSW, lonSW], [latNE, lonNE]]; set when ships are enabled
 }
 
 // HistoryReader serves stored paths; nil means tracks come from memory only.

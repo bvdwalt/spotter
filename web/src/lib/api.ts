@@ -58,6 +58,8 @@ export interface ClientConfig {
   track_window_s: number;
   poll_interval_s: number;
   basemap_url?: string;
+  adsb_circles: { lat: number; lon: number; radius_nm: number }[];
+  ais_bbox?: [[number, number], [number, number]];
 }
 
 export interface SourceStatus {

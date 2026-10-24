@@ -130,6 +130,8 @@ func run(ctx context.Context, cfg *config.Config) error {
 				TrackWindowS:    cfg.TrackWindow.Seconds(),
 				PollIntervalS:   cfg.ADSBPollInterval.Seconds(),
 				BasemapURL:      basemapURL(cfg.BasemapPMTiles),
+				ADSBCircles:     cfg.ADSBPoints,
+				AISBBox:         aisBBox(cfg),
 			},
 		}),
 		ReadHeaderTimeout: 10 * time.Second,
@@ -218,4 +220,11 @@ func main() {
 		os.Exit(1)
 	}
 	slog.Info("shutdown complete")
+}
+
+func aisBBox(cfg *config.Config) *[2][2]float64 {
+	if cfg.AISStreamAPIKey == "" {
+		return nil
+	}
+	return &cfg.AISBBox
 }

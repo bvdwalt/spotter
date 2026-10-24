@@ -32,6 +32,10 @@
         <option value="vessel">vessels</option>
       </select>
       <label><input type="checkbox" bind:checked={store.hideGround} /> hide ground</label>
+      <label><input type="checkbox" bind:checked={store.planeRange} /> plane range</label>
+      {#if store.config?.ais_bbox}
+        <label><input type="checkbox" bind:checked={store.shipArea} /> ship area</label>
+      {/if}
       <label>
         airports
         <select bind:value={store.airports}>

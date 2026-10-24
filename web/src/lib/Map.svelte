@@ -5,10 +5,10 @@
   import workerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url";
   import { Protocol } from "pmtiles";
   import { layers as basemapLayers, namedFlavor } from "@protomaps/basemaps";
-  import type { Contact } from "./api";
+  import type { ClientConfig, Contact } from "./api";
   import { ICONS, loadIcon } from "./icons";
   import { store } from "./contacts.svelte";
-  import { greatCircle } from "./geo";
+  import { circleRing, greatCircle } from "./geo";
 
   // MapLibre 6 cannot find its worker inside a bundle, so Vite emits it and we point MapLibre at it.
   maplibregl.setWorkerUrl(workerUrl);
@@ -102,6 +102,32 @@
     };
   }
 
+  function planeRangeGeoJSON(cfg: ClientConfig): GeoJSON.FeatureCollection {
+    return {
+      type: "FeatureCollection",
+      features: cfg.adsb_circles.map((c) => ({
+        type: "Feature",
+        geometry: { type: "Polygon", coordinates: [circleRing(c.lat, c.lon, c.radius_nm)] },
+        properties: {},
+      })),
+    };
+  }
+
+  function shipAreaGeoJSON(cfg: ClientConfig): GeoJSON.FeatureCollection {
+    if (!cfg.ais_bbox) return { type: "FeatureCollection", features: [] };
+    const [[s, w], [n, e]] = cfg.ais_bbox;
+    return {
+      type: "FeatureCollection",
+      features: [
+        {
+          type: "Feature",
+          geometry: { type: "Polygon", coordinates: [[[w, s], [e, s], [e, n], [w, n], [w, s]]] },
+          properties: {},
+        },
+      ],
+    };
+  }
+
   $effect(() => {
     const cfg = store.config;
     if (!cfg || map) return;
@@ -161,6 +187,36 @@
           paint: { "text-color": "#445566", "text-halo-color": "#fff", "text-halo-width": 1.2 },
         });
       }
+      m.addSource("plane-range", { type: "geojson", data: planeRangeGeoJSON(cfg) });
+      m.addLayer({
+        id: "plane-range-fill",
+        type: "fill",
+        source: "plane-range",
+        layout: { visibility: store.planeRange ? "visible" : "none" },
+        paint: { "fill-color": "#4ecdc4", "fill-opacity": 0.07 },
+      });
+      m.addLayer({
+        id: "plane-range-line",
+        type: "line",
+        source: "plane-range",
+        layout: { visibility: store.planeRange ? "visible" : "none" },
+        paint: { "line-color": "#2a9d8f", "line-width": 1, "line-opacity": 0.5, "line-dasharray": [3, 3] },
+      });
+      m.addSource("ship-area", { type: "geojson", data: shipAreaGeoJSON(cfg) });
+      m.addLayer({
+        id: "ship-area-fill",
+        type: "fill",
+        source: "ship-area",
+        layout: { visibility: store.shipArea ? "visible" : "none" },
+        paint: { "fill-color": "#3a86ff", "fill-opacity": 0.06 },
+      });
+      m.addLayer({
+        id: "ship-area-line",
+        type: "line",
+        source: "ship-area",
+        layout: { visibility: store.shipArea ? "visible" : "none" },
+        paint: { "line-color": "#3a86ff", "line-width": 1, "line-opacity": 0.5, "line-dasharray": [3, 3] },
+      });
       m.addSource("home", {
         type: "geojson",
         data: { type: "Feature", geometry: { type: "Point", coordinates: [cfg.home_lon, cfg.home_lat] }, properties: {} },
@@ -266,6 +322,17 @@
     };
     show("airports-major", mode !== "off");
     show("airports-minor", mode === "all");
+  });
+
+  $effect(() => {
+    if (!ready || !map) return;
+    const toggle = (id: string, on: boolean) => {
+      for (const part of ["fill", "line"]) {
+        map?.setLayoutProperty(`${id}-${part}`, "visibility", on ? "visible" : "none");
+      }
+    };
+    toggle("plane-range", store.planeRange);
+    toggle("ship-area", store.shipArea);
   });
 
   // Follow: re-centre on the selected contact whenever its position changes.

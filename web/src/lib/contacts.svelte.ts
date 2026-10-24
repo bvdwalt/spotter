@@ -14,6 +14,25 @@ function loadAirportMode(): AirportMode {
   return "major";
 }
 
+function loadFlag(key: string): boolean {
+  try {
+    return localStorage.getItem(key) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function saveFlag(key: string, on: boolean) {
+  try {
+    localStorage.setItem(key, on ? "1" : "0");
+  } catch {
+    // not persisted; the choice still applies for this page load
+  }
+}
+
+const PLANE_RANGE_PREF = "spotter.planeRange";
+const SHIP_AREA_PREF = "spotter.shipArea";
+
 class ContactStore {
   config = $state<ClientConfig | null>(null);
   contacts = $state<Contact[]>([]);
@@ -37,6 +56,26 @@ class ContactStore {
     } catch {
       // not persisted; the choice still applies for this page load
     }
+  }
+  #planeRange = $state(loadFlag(PLANE_RANGE_PREF));
+  #shipArea = $state(loadFlag(SHIP_AREA_PREF));
+
+  get planeRange(): boolean {
+    return this.#planeRange;
+  }
+
+  set planeRange(on: boolean) {
+    this.#planeRange = on;
+    saveFlag(PLANE_RANGE_PREF, on);
+  }
+
+  get shipArea(): boolean {
+    return this.#shipArea;
+  }
+
+  set shipArea(on: boolean) {
+    this.#shipArea = on;
+    saveFlag(SHIP_AREA_PREF, on);
   }
   kind = $state<"all" | Kind>("all");
   query = $state("");
