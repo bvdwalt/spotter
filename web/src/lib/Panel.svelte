@@ -207,6 +207,13 @@
     color: #ff9f43;
     font-weight: 600;
   }
+  @media (max-width: 800px) {
+    .watch,
+    .close {
+      min-height: 2.5rem;
+      padding: 0 0.75rem;
+    }
+  }
   .track {
     margin-top: 0.5rem;
     font-size: 0.75rem;

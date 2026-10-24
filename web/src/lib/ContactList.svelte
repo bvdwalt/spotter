@@ -122,6 +122,7 @@
 
 <style>
   .head {
+    white-space: nowrap;
     position: sticky;
     top: 0;
     z-index: 1;
@@ -260,6 +261,14 @@
     padding: 2rem 1rem;
     text-align: center;
     color: var(--muted);
+  }
+  @media (max-width: 800px) {
+    .segmented button {
+      min-height: 2.1rem;
+    }
+    li > button {
+      min-height: 3.4rem;
+    }
   }
   .link {
     margin-top: 0.5rem;
