@@ -14,30 +14,31 @@ import (
 const maxADSBPoints = 5
 
 type Config struct {
-	Port             string
-	HomeLat          float64
-	HomeLon          float64
-	RadiusNM         float64
-	ADSBBaseURL      string
-	ADSBPoints       []model.Circle // query circles; defaults to one around home with RadiusNM
-	ADSBPollInterval time.Duration
-	AISStreamAPIKey  string
-	AISBBox          [2][2]float64 // [[latSW, lonSW], [latNE, lonNE]]
-	RouteAPIURL      string        // empty disables route lookups
-	PhotoAPIURL      string        // empty disables aircraft photos
-	BasemapPMTiles   string        // path to a PMTiles file served at /basemap.pmtiles; empty uses OpenFreeMap
-	NtfyURL          string
-	NtfyToken        string
-	WatchList        []string
-	AlertCooldown    time.Duration
-	AircraftExpiry   time.Duration
-	VesselExpiry     time.Duration
-	TrackWindow      time.Duration
-	DBPath           string // empty keeps tracks in memory only
-	HistoryRetention time.Duration
-	HistoryInterval  time.Duration
-	TrackHistory     time.Duration // how much stored path the track endpoint returns
-	TrackMinInterval time.Duration
+	Port              string
+	HomeLat           float64
+	HomeLon           float64
+	RadiusNM          float64
+	ADSBBaseURL       string
+	ADSBPoints        []model.Circle // query circles; defaults to one around home with RadiusNM
+	ADSBPollInterval  time.Duration
+	AISStreamAPIKey   string
+	AISBBox           [2][2]float64 // [[latSW, lonSW], [latNE, lonNE]]
+	RouteAPIURL       string        // empty disables route lookups
+	PhotoAPIURL       string        // empty disables aircraft photos
+	BasemapPMTiles    string        // path to a PMTiles file served at /basemap.pmtiles; empty uses OpenFreeMap
+	NtfyURL           string
+	NtfyToken         string
+	WatchList         []string
+	AlertCooldown     time.Duration
+	AircraftExpiry    time.Duration
+	VesselExpiry      time.Duration
+	TrackWindow       time.Duration
+	DBPath            string // empty keeps tracks in memory only
+	HistoryRetention  time.Duration
+	HistoryInterval   time.Duration
+	HistoryToleranceM float64       // stored paths may deviate this far from the real track
+	TrackHistory      time.Duration // how much stored path the track endpoint returns
+	TrackMinInterval  time.Duration
 }
 
 func Load() (*Config, error) {
@@ -67,6 +68,12 @@ func Load() (*Config, error) {
 	}
 	if cfg.RadiusNM <= 0 || cfg.RadiusNM > 250 {
 		return nil, fmt.Errorf("RADIUS_NM must be between 1 and 250, got %v", cfg.RadiusNM)
+	}
+	if cfg.HistoryToleranceM, err = floatEnv("HISTORY_TOLERANCE_M", 50); err != nil {
+		return nil, err
+	}
+	if cfg.HistoryToleranceM < 1 || cfg.HistoryToleranceM > 1000 {
+		return nil, fmt.Errorf("HISTORY_TOLERANCE_M must be between 1 and 1000, got %v", cfg.HistoryToleranceM)
 	}
 	if cfg.ADSBPoints, err = pointsEnv("ADSB_POINTS", model.Circle{Lat: cfg.HomeLat, Lon: cfg.HomeLon, RadiusNM: cfg.RadiusNM}); err != nil {
 		return nil, err

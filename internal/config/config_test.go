@@ -72,3 +72,21 @@ func TestPointsRejects(t *testing.T) {
 		}
 	}
 }
+
+func TestHistoryToleranceDefaultsAndRejects(t *testing.T) {
+	t.Setenv("HOME_LAT", "-33.9")
+	t.Setenv("HOME_LON", "18.4")
+	cfg, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.HistoryToleranceM != 50 {
+		t.Errorf("default tolerance = %v, want 50", cfg.HistoryToleranceM)
+	}
+	for _, bad := range []string{"0", "-5", "5000", "wide"} {
+		t.Setenv("HISTORY_TOLERANCE_M", bad)
+		if _, err := Load(); err == nil {
+			t.Errorf("HISTORY_TOLERANCE_M=%q should be rejected", bad)
+		}
+	}
+}
