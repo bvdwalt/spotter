@@ -6,8 +6,9 @@ import (
 	"github.com/bvdwalt/spotter/internal/model"
 )
 
-// LegGap is a silence long enough to mean the contact stopped somewhere out of view. It is longer than
-// the 30 minute heartbeat history keeps for a still contact, so a moored ship stays one leg.
+// LegGap is a silence long enough to mean the contact stopped somewhere out of view, unless it is airborne
+// under the same callsign on both sides. It is longer than the 30 minute heartbeat history keeps for a
+// still contact, so a moored ship stays one leg.
 const LegGap = 45 * time.Minute
 
 // Leg is one flight or voyage: from takeoff to touchdown, between callsign changes, or between long gaps.
@@ -26,7 +27,7 @@ func Legs(ps []model.Position) []Leg {
 	var ground []model.Position // on-ground points since the last airborne one
 	callsign := ""
 	for i, p := range ps {
-		if i > 0 && p.Time.Sub(ps[i-1].Time) > LegGap {
+		if i > 0 && p.Time.Sub(ps[i-1].Time) > LegGap && !sameFlight(ps[i-1], p) {
 			open = false
 			ground = nil
 		}
@@ -63,6 +64,11 @@ func Legs(ps []model.Position) []Leg {
 		legs = append(legs, l)
 	}
 	return legs
+}
+
+// sameFlight reports whether a gap between a and b is a coverage hole in one flight rather than a stop.
+func sameFlight(a, b model.Position) bool {
+	return !a.OnGround && !b.OnGround && a.Callsign != "" && a.Callsign == b.Callsign
 }
 
 func (l *Leg) add(p model.Position) {

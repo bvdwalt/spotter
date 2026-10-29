@@ -66,6 +66,26 @@ func TestLegsSplitOnLongGap(t *testing.T) {
 	}
 }
 
+func TestLegsKeepSameFlightAcrossCoverageGap(t *testing.T) {
+	// The same flight flies out of coverage for an hour and comes back.
+	ps := []model.Position{pos(0, "SFR177", false), pos(5, "SFR177", false), pos(65, "SFR177", false), pos(70, "SFR177", false)}
+	if got := legSizes(Legs(ps)); len(got) != 1 || got[0] != 4 {
+		t.Fatalf("want one leg of 4, got %v", got)
+	}
+}
+
+func TestLegsSplitGapWithoutMatchingCallsigns(t *testing.T) {
+	cases := map[string][]model.Position{
+		"new callsign":     {pos(0, "SFR177", false), pos(65, "SFR251", false)},
+		"callsign missing": {pos(0, "SFR177", false), pos(65, "", false)},
+	}
+	for name, ps := range cases {
+		if got := legSizes(Legs(ps)); len(got) != 2 {
+			t.Errorf("%s: want two legs, got %v", name, got)
+		}
+	}
+}
+
 func TestLegsKeepMooredShipWhole(t *testing.T) {
 	// A still vessel is stored once every 30 minutes, which must not read as a gap.
 	ps := []model.Position{pos(0, "", false), pos(30, "", false), pos(60, "", false), pos(90, "", false)}
