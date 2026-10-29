@@ -45,6 +45,8 @@ type tracker struct {
 	anchor model.Contact
 	held   []model.Contact
 	at     time.Time // when the newest accepted sample was seen
+	// callsign is the newest non-empty one seen, so a feed that drops it now and then is not a new flight.
+	callsign string
 }
 
 type Store struct {
@@ -66,11 +68,24 @@ func (s *Store) Record(c model.Contact) {
 	defer s.mu.Unlock()
 	t, ok := s.last[c.ID]
 	if !ok {
-		s.last[c.ID] = &tracker{anchor: c, at: c.Seen}
+		s.last[c.ID] = &tracker{anchor: c, at: c.Seen, callsign: c.Callsign}
 		s.buf = append(s.buf, c)
 		return
 	}
 	if c.Seen.Sub(t.at) < s.opts.MinInterval {
+		return
+	}
+	// A new flight or a touchdown or takeoff marks where one leg ends, so it is stored even on a straight line.
+	newFlight := c.Callsign != "" && t.callsign != "" && c.Callsign != t.callsign
+	if c.Callsign != "" {
+		t.callsign = c.Callsign
+	}
+	if newFlight || c.OnGround != t.anchor.OnGround {
+		if len(t.held) > 0 {
+			s.write(t, t.held[len(t.held)-1])
+		}
+		t.at = c.Seen
+		s.write(t, c)
 		return
 	}
 	if len(t.held) == 0 && c.Seen.Sub(t.anchor.Seen) < s.opts.StillHeartbeat &&
@@ -184,13 +199,14 @@ func (s *Store) insert(ctx context.Context, batch []model.Contact) error {
 		return err
 	}
 	defer func() { _ = tx.Rollback() }()
-	stmt, err := tx.PrepareContext(ctx, `INSERT INTO positions (contact_id, kind, ts, lat, lon, alt_ft, speed_kt, heading_deg) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
+	stmt, err := tx.PrepareContext(ctx, `INSERT INTO positions (contact_id, kind, ts, lat, lon, alt_ft, speed_kt, heading_deg, callsign, on_ground) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
 	if err != nil {
 		return err
 	}
 	defer func() { _ = stmt.Close() }()
 	for _, c := range batch {
-		if _, err := stmt.ExecContext(ctx, c.ID, string(c.Kind), c.Seen.UnixMilli(), c.Lat, c.Lon, c.AltFt, c.SpeedKt, c.HeadingDeg); err != nil {
+		callsign := sql.NullString{String: c.Callsign, Valid: c.Callsign != ""}
+		if _, err := stmt.ExecContext(ctx, c.ID, string(c.Kind), c.Seen.UnixMilli(), c.Lat, c.Lon, c.AltFt, c.SpeedKt, c.HeadingDeg, callsign, c.OnGround); err != nil {
 			return fmt.Errorf("insert %s: %w", c.ID, err)
 		}
 	}
@@ -216,7 +232,7 @@ func (s *Store) Prune(ctx context.Context, now time.Time) (int64, error) {
 
 // Track returns a contact's stored positions since the given time, oldest first.
 func (s *Store) Track(ctx context.Context, id string, since time.Time) ([]model.Position, error) {
-	rows, err := s.db.QueryContext(ctx, `SELECT ts, lat, lon, alt_ft, speed_kt, heading_deg FROM positions WHERE contact_id = ? AND ts >= ? ORDER BY ts`, id, since.UnixMilli())
+	rows, err := s.db.QueryContext(ctx, `SELECT ts, lat, lon, alt_ft, speed_kt, heading_deg, callsign, on_ground FROM positions WHERE contact_id = ? AND ts >= ? ORDER BY ts`, id, since.UnixMilli())
 	if err != nil {
 		return nil, err
 	}
@@ -229,11 +245,13 @@ func (s *Store) Track(ctx context.Context, id string, since time.Time) ([]model.
 			alt     sql.NullInt64
 			speed   sql.NullFloat64
 			heading sql.NullFloat64
+			call    sql.NullString
 		)
-		if err := rows.Scan(&ts, &p.Lat, &p.Lon, &alt, &speed, &heading); err != nil {
+		if err := rows.Scan(&ts, &p.Lat, &p.Lon, &alt, &speed, &heading, &call, &p.OnGround); err != nil {
 			return nil, err
 		}
 		p.Time = time.UnixMilli(ts)
+		p.Callsign = call.String
 		if alt.Valid {
 			v := int(alt.Int64)
 			p.AltFt = &v

@@ -31,6 +31,9 @@ func TestParseFixture(t *testing.T) {
 	if c.Kind != model.KindAircraft || !strings.HasPrefix(c.ID, "a:") {
 		t.Errorf("bad kind/id: %+v", c)
 	}
+	if c.Callsign != "SAA375" {
+		t.Errorf("callsign should be trimmed, got %q", c.Callsign)
+	}
 	if c.Label == "" || c.AltFt == nil || c.HeadingDeg == nil {
 		t.Errorf("missing fields: %+v", c)
 	}
@@ -55,8 +58,8 @@ func TestParseGroundAndSkips(t *testing.T) {
 	if !c.OnGround || c.AltFt != nil {
 		t.Errorf("expected on ground: %+v", c)
 	}
-	if c.Label != "ZS-ABC" {
-		t.Errorf("label fallback to reg, got %q", c.Label)
+	if c.Label != "ZS-ABC" || c.Callsign != "" {
+		t.Errorf("label fallback to reg without a callsign, got %q %q", c.Label, c.Callsign)
 	}
 	if !c.Military || c.Emergency != "7700" {
 		t.Errorf("flags: %+v", c)

@@ -111,7 +111,9 @@
       <dt>Seen</dt><dd>{ageText(c.seen, store.now)}</dd>
       {#if c.military}<dt>Flags</dt><dd class="alert">military</dd>{/if}
     </dl>
-    <p class="track">Track: {store.track.length} points</p>
+    <p class="track">
+      Track: {store.track.reduce((n, l) => n + l.positions.length, 0)} points{#if store.track.length > 1}, {store.track.length} legs{/if}
+    </p>
   </section>
 {/if}
 

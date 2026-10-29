@@ -252,3 +252,75 @@ func TestIdleContactReleasesItsLastPosition(t *testing.T) {
 		t.Fatalf("an idle contact should store its newest position, got %+v", got)
 	}
 }
+
+func TestNewCallsignMidLineIsStored(t *testing.T) {
+	s := newTestStore(t)
+	// Straight level flight; the callsign changes at 60 s, which the straight-line filter alone would drop.
+	for i := 0; i <= 12; i++ {
+		c := contact("a:1", model.KindAircraft, time.Duration(i)*10*time.Second, -33, 18+float64(i)*0.02)
+		c.Callsign = "SFR177"
+		if i >= 6 {
+			c.Callsign = "SFR251"
+		}
+		s.Record(c)
+	}
+	s.releaseHeld(base.Add(time.Hour), 0)
+	_ = s.Flush(context.Background())
+	got, _ := s.Track(context.Background(), "a:1", base.Add(-time.Hour))
+	var first *model.Position
+	for i := range got {
+		if got[i].Callsign == "SFR251" {
+			first = &got[i]
+			break
+		}
+	}
+	if first == nil || !first.Time.Equal(base.Add(60*time.Second)) {
+		t.Fatalf("the first sample under the new callsign should be stored, got %+v", got)
+	}
+	if got[0].Callsign != "SFR177" {
+		t.Errorf("callsign should round-trip, got %q", got[0].Callsign)
+	}
+}
+
+func TestMissingCallsignDoesNotForceAWrite(t *testing.T) {
+	s := newTestStore(t)
+	for i := 0; i <= 12; i++ {
+		c := contact("a:1", model.KindAircraft, time.Duration(i)*10*time.Second, -33, 18+float64(i)*0.02)
+		if i%3 != 0 {
+			c.Callsign = "SFR177"
+		}
+		s.Record(c)
+	}
+	s.releaseHeld(base.Add(time.Hour), 0)
+	_ = s.Flush(context.Background())
+	got, _ := s.Track(context.Background(), "a:1", base.Add(-time.Hour))
+	if len(got) != 2 { // first fix and the released last one
+		t.Fatalf("callsign dropouts should not add rows, got %d", len(got))
+	}
+}
+
+func TestTouchdownAndTakeoffAreStored(t *testing.T) {
+	s := newTestStore(t)
+	// Rolls down the runway in a straight line: airborne, on the ground, then airborne again.
+	for i := 0; i <= 12; i++ {
+		c := contact("a:1", model.KindAircraft, time.Duration(i)*10*time.Second, -33, 18+float64(i)*0.01)
+		c.AltFt = nil
+		c.OnGround = i >= 4 && i < 8
+		s.Record(c)
+	}
+	s.releaseHeld(base.Add(time.Hour), 0)
+	_ = s.Flush(context.Background())
+	got, _ := s.Track(context.Background(), "a:1", base.Add(-time.Hour))
+	want := map[time.Duration]bool{40 * time.Second: true, 80 * time.Second: false}
+	for at, ground := range want {
+		found := false
+		for _, p := range got {
+			if p.Time.Equal(base.Add(at)) && p.OnGround == ground {
+				found = true
+			}
+		}
+		if !found {
+			t.Errorf("want a row at %v with on_ground=%v, got %+v", at, ground, got)
+		}
+	}
+}

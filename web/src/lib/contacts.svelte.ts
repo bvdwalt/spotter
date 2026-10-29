@@ -1,4 +1,4 @@
-import { api, type Alert, type ClientConfig, type Contact, type Kind, type Position, type Status } from "./api";
+import { api, type Alert, type ClientConfig, type Contact, type Kind, type Leg, type Status } from "./api";
 import { searchTerms } from "./airlines";
 
 export type AirportMode = "off" | "major" | "all";
@@ -40,7 +40,7 @@ class ContactStore {
   alerts = $state<Alert[]>([]);
   watch = $state<string[]>([]);
   selectedId = $state<string | null>(null);
-  track = $state<Position[]>([]);
+  track = $state<Leg[]>([]);
   hideGround = $state(true);
   follow = $state(false);
   #airports = $state<AirportMode>(loadAirportMode());
@@ -176,7 +176,7 @@ class ContactStore {
   private async refreshTrack() {
     if (!this.selectedId) return;
     try {
-      this.track = (await api.track(this.selectedId)).positions;
+      this.track = (await api.track(this.selectedId)).legs;
     } catch {
       this.track = [];
     }

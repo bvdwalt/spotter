@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/bvdwalt/spotter/internal/model"
+	"github.com/bvdwalt/spotter/internal/track"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -56,7 +57,7 @@ func (h *handlers) track(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": "unknown contact"})
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"positions": positions})
+	writeJSON(w, http.StatusOK, map[string]any{"legs": track.Legs(positions)})
 }
 
 // photo returns the first planespotters photo for an aircraft; vessels and unknown hexes get 404.

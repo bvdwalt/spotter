@@ -15,6 +15,8 @@ type Position struct {
 	AltFt      *int      `json:"alt_ft,omitempty"`
 	SpeedKt    *float64  `json:"speed_kt,omitempty"`
 	HeadingDeg *float64  `json:"heading_deg,omitempty"`
+	Callsign   string    `json:"callsign,omitempty"`
+	OnGround   bool      `json:"on_ground,omitempty"`
 	Time       time.Time `json:"time"`
 }
 
@@ -44,6 +46,7 @@ type Contact struct {
 	ID          string     `json:"id"` // "a:<hex>" or "v:<mmsi>"
 	Kind        Kind       `json:"kind"`
 	Label       string     `json:"label"`
+	Callsign    string     `json:"callsign,omitempty"` // as broadcast; unlike Label it never falls back to the registration
 	Lat         float64    `json:"lat"`
 	Lon         float64    `json:"lon"`
 	AltFt       *int       `json:"alt_ft,omitempty"`
@@ -67,7 +70,7 @@ type Contact struct {
 }
 
 func (c Contact) Position() Position {
-	return Position{Lat: c.Lat, Lon: c.Lon, AltFt: c.AltFt, SpeedKt: c.SpeedKt, HeadingDeg: c.HeadingDeg, Time: c.Seen}
+	return Position{Lat: c.Lat, Lon: c.Lon, AltFt: c.AltFt, SpeedKt: c.SpeedKt, HeadingDeg: c.HeadingDeg, Callsign: c.Callsign, OnGround: c.OnGround, Time: c.Seen}
 }
 
 type SourceStatus struct {
