@@ -46,7 +46,17 @@ export interface Position {
   alt_ft?: number;
   speed_kt?: number;
   heading_deg?: number;
+  callsign?: string;
+  on_ground?: boolean;
   time: string;
+}
+
+/** One flight or voyage of a track; the server splits at callsign changes, ground stops and long gaps. */
+export interface Leg {
+  callsign?: string;
+  start: string;
+  end: string;
+  positions: Position[];
 }
 
 export interface ClientConfig {
@@ -122,7 +132,7 @@ export const api = {
     del(`/api/alerts/${a.rule}/${encodeURIComponent(a.contact_id)}?at=${encodeURIComponent(a.time)}`),
   config: () => getJSON<ClientConfig>("/api/config"),
   contacts: () => getJSON<{ now: string; contacts: Contact[] }>("/api/contacts"),
-  track: (id: string) => getJSON<{ positions: Position[] }>(`/api/contacts/${encodeURIComponent(id)}/track`),
+  track: (id: string) => getJSON<{ legs: Leg[] }>(`/api/contacts/${encodeURIComponent(id)}/track`),
   status: () => getJSON<Status>("/api/status"),
   alerts: () => getJSON<{ alerts: Alert[] }>("/api/alerts"),
   photo: (id: string) => getJSON<{ photo: Photo }>(`/api/contacts/${encodeURIComponent(id)}/photo`),

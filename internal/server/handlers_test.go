@@ -165,13 +165,18 @@ func (f fakeHistory) Track(_ context.Context, id string, _ time.Time) ([]model.P
 	return f.rows[id], f.err
 }
 
+// trackLen returns the status and the number of positions across all legs.
 func trackLen(t *testing.T, h http.Handler, path string) (int, int) {
 	t.Helper()
 	code, body := get(t, h, path)
 	if code != 200 {
 		return code, 0
 	}
-	return code, len(body["positions"].([]any))
+	n := 0
+	for _, l := range body["legs"].([]any) {
+		n += len(l.(map[string]any)["positions"].([]any))
+	}
+	return code, n
 }
 
 func TestTrackFromHistory(t *testing.T) {
@@ -188,6 +193,10 @@ func TestTrackFromHistory(t *testing.T) {
 	// Three stored rows plus the one live point newer than the last stored row.
 	if code, n := trackLen(t, h, "/api/contacts/a:1/track"); code != 200 || n != 4 {
 		t.Errorf("a:1: code %d, %d positions, want 200 and 4", code, n)
+	}
+	// The hour between stored rows is a gap, and the live point continues the newest leg.
+	if _, body := get(t, h, "/api/contacts/a:1/track"); len(body["legs"].([]any)) != 3 {
+		t.Errorf("a:1: want 3 legs, got %v", body["legs"])
 	}
 	// A contact that has expired from memory still has its stored path.
 	if code, n := trackLen(t, h, "/api/contacts/a:gone/track"); code != 200 || n != 1 {

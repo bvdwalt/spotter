@@ -1,0 +1,2 @@
+ALTER TABLE positions ADD COLUMN callsign TEXT;
+ALTER TABLE positions ADD COLUMN on_ground INTEGER NOT NULL DEFAULT 0;

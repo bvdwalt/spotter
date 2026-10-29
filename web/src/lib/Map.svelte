@@ -66,14 +66,23 @@
     };
   }
 
+  /** One line per leg, the newest marked current. */
   function trackGeoJSON(): GeoJSON.FeatureCollection {
-    const coords = store.track.map((p) => [p.lon, p.lat]);
     const sel = store.selected;
-    if (sel && coords.length) coords.push([sel.lon, sel.lat]);
-    return {
-      type: "FeatureCollection",
-      features: coords.length > 1 ? [{ type: "Feature", geometry: { type: "LineString", coordinates: coords }, properties: {} }] : [],
-    };
+    const features: GeoJSON.Feature[] = [];
+    store.track.forEach((leg, i) => {
+      const current = i === store.track.length - 1;
+      const coords = leg.positions.map((p) => [p.lon, p.lat]);
+      if (current && sel) coords.push([sel.lon, sel.lat]);
+      if (coords.length > 1) {
+        features.push({
+          type: "Feature",
+          geometry: { type: "LineString", coordinates: coords },
+          properties: { current, callsign: leg.callsign ?? "" },
+        });
+      }
+    });
+    return { type: "FeatureCollection", features };
   }
 
   function routeGeoJSON(): GeoJSON.FeatureCollection {
@@ -253,7 +262,32 @@
         id: "track",
         type: "line",
         source: "track",
+        filter: ["all", ["==", ["geometry-type"], "LineString"], ["get", "current"]],
         paint: { "line-color": "#4ecdc4", "line-width": 2.5, "line-opacity": 0.9 },
+      });
+      // Earlier legs are dotted so they read as this track's history rather than a basemap road.
+      m.addLayer({
+        id: "track-past",
+        type: "line",
+        source: "track",
+        filter: ["all", ["==", ["geometry-type"], "LineString"], ["!", ["get", "current"]]],
+        paint: { "line-color": "#2a9d8f", "line-width": 2, "line-opacity": 0.6, "line-dasharray": [1, 2] },
+      });
+      // The label sits midway along its own leg so it cannot be read as the next leg's callsign.
+      m.addLayer({
+        id: "track-labels",
+        type: "symbol",
+        source: "track",
+        filter: ["!", ["get", "current"]],
+        layout: {
+          "symbol-placement": "line-center",
+          "text-field": ["get", "callsign"],
+          "text-size": 10,
+          "text-font": ["Noto Sans Regular"],
+          "text-offset": [0, -0.8],
+          "text-optional": true,
+        },
+        paint: { "text-color": "#2a9d8f", "text-halo-color": "#fff", "text-halo-width": 1.2 },
       });
       m.addSource("contacts", { type: "geojson", data: contactsGeoJSON([]) });
       m.addLayer({

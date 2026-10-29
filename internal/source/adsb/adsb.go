@@ -302,9 +302,10 @@ func Parse(dec *json.Decoder, source string, fallbackNow time.Time) ([]model.Con
 		if a.SeenPos != nil {
 			c.Seen = now.Add(-time.Duration(*a.SeenPos * float64(time.Second)))
 		}
-		switch label := strings.TrimSpace(a.Flight); {
-		case label != "":
-			c.Label = label
+		c.Callsign = strings.TrimSpace(a.Flight)
+		switch {
+		case c.Callsign != "":
+			c.Label = c.Callsign
 		case a.Reg != "":
 			c.Label = a.Reg
 		default:
