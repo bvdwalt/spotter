@@ -18,6 +18,12 @@
   const anyBad = $derived(sources.some((s) => !sourceOk(s)));
   let showStatus = $state(false);
 
+  const REPO = "https://github.com/bvdwalt/spotter";
+  const rawVersion = $derived(store.status?.version ?? "");
+  const version = $derived(rawVersion && /^\d/.test(rawVersion) ? `v${rawVersion}` : rawVersion);
+  // Only clean release builds have a tag; dev and git-describe builds link to the repo.
+  const versionHref = $derived(/^v\d+\.\d+\.\d+$/.test(version) ? `${REPO}/releases/tag/${version}` : REPO);
+
   // Narrow screens show the panel as a bottom sheet over the map.
   type Snap = "peek" | "half" | "full";
   const snaps: Snap[] = ["peek", "half", "full"];
@@ -74,6 +80,9 @@
     <header class="toolbar">
       <div class="brand">
         <strong>spotter</strong>
+        {#if version}
+          <a class="version" href={versionHref} target="_blank" rel="noopener noreferrer">{version}</a>
+        {/if}
         <button
           class="dot"
           class:bad={anyBad || !!store.error}
@@ -134,6 +143,16 @@
   }
   .count {
     color: var(--muted);
+  }
+  .version {
+    font-family: ui-monospace, monospace;
+    font-size: 0.75rem;
+    color: var(--muted);
+    text-decoration: none;
+  }
+  .version:hover {
+    color: var(--text);
+    text-decoration: underline;
   }
   .dot {
     width: 0.6rem;
