@@ -66,14 +66,16 @@
     };
   }
 
-  /** One line per leg, the newest marked current. */
+  /** One line per leg; the one being scrubbed, else the newest, is marked current. */
   function trackGeoJSON(): GeoJSON.FeatureCollection {
     const sel = store.selected;
+    const last = store.track.length - 1;
+    const active = store.scrubbed?.leg ?? last;
     const features: GeoJSON.Feature[] = [];
     store.track.forEach((leg, i) => {
-      const current = i === store.track.length - 1;
+      const current = i === active;
       const coords = leg.positions.map((p) => [p.lon, p.lat]);
-      if (current && sel) coords.push([sel.lon, sel.lat]);
+      if (i === last && sel) coords.push([sel.lon, sel.lat]);
       if (coords.length > 1) {
         features.push({
           type: "Feature",
@@ -83,6 +85,23 @@
       }
     });
     return { type: "FeatureCollection", features };
+  }
+
+  /** A faded copy of the selected contact's icon where it was at the scrubbed time. */
+  function scrubGeoJSON(): GeoJSON.FeatureCollection {
+    const s = store.scrubbed;
+    const sel = store.selected;
+    if (!s || !sel) return { type: "FeatureCollection", features: [] };
+    return {
+      type: "FeatureCollection",
+      features: [
+        {
+          type: "Feature",
+          geometry: { type: "Point", coordinates: [s.lon, s.lat] },
+          properties: { icon: iconFor(sel), heading: s.heading_deg ?? 0 },
+        },
+      ],
+    };
   }
 
   function routeGeoJSON(): GeoJSON.FeatureCollection {
@@ -289,6 +308,21 @@
         },
         paint: { "text-color": "#2a9d8f", "text-halo-color": "#fff", "text-halo-width": 1.2 },
       });
+      m.addSource("scrub", { type: "geojson", data: scrubGeoJSON() });
+      m.addLayer({
+        id: "scrub",
+        type: "symbol",
+        source: "scrub",
+        layout: {
+          "icon-image": ["get", "icon"],
+          "icon-size": 0.42,
+          "icon-rotate": ["get", "heading"],
+          "icon-rotation-alignment": "map",
+          "icon-allow-overlap": true,
+          "icon-ignore-placement": true,
+        },
+        paint: { "icon-opacity": 0.6 },
+      });
       m.addSource("contacts", { type: "geojson", data: contactsGeoJSON([]) });
       m.addLayer({
         id: "contacts",
@@ -343,7 +377,24 @@
 
   $effect(() => {
     if (!ready || !map) return;
+    (map.getSource("scrub") as GeoJSONSource | undefined)?.setData(scrubGeoJSON());
+  });
+
+  $effect(() => {
+    if (!ready || !map) return;
     (map.getSource("route") as GeoJSONSource | undefined)?.setData(routeGeoJSON());
+  });
+
+  // Fit a picked leg into view once, then forget it so later polls do not pull the map back.
+  $effect(() => {
+    const coords = store.focus;
+    if (!ready || !map || !coords || coords.length === 0) return;
+    const bounds = coords.reduce(
+      (b, c) => b.extend(c as [number, number]),
+      new maplibregl.LngLatBounds(coords[0] as [number, number], coords[0] as [number, number]),
+    );
+    map.fitBounds(bounds, { padding: 60, maxZoom: 10, duration: 800 });
+    store.focus = null;
   });
 
   $effect(() => {
@@ -369,11 +420,14 @@
     toggle("ship-area", store.shipArea);
   });
 
-  // Follow: re-centre on the selected contact whenever its position changes.
+  // Follow: re-centre on the selected contact whenever its position changes, or on where it was while scrubbing.
   $effect(() => {
     const sel = store.selected;
+    const s = store.scrubbed;
     if (!ready || !map || !store.follow || !sel) return;
-    map.easeTo({ center: [sel.lon, sel.lat], duration: 800 });
+    // The slider fires many times a second, so an animation per step would lag behind and stutter.
+    if (s) map.jumpTo({ center: [s.lon, s.lat] });
+    else map.easeTo({ center: [sel.lon, sel.lat], duration: 800 });
   });
 
   // Dragging the map is the natural way to stop following.
