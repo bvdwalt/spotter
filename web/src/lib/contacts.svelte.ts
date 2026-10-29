@@ -1,5 +1,7 @@
 import { api, type Alert, type ClientConfig, type Contact, type Kind, type Leg, type Status } from "./api";
 import { searchTerms } from "./airlines";
+import { positionAt } from "./scrub";
+import { type AirportPoint, loadAirports } from "./airports";
 
 export type AirportMode = "off" | "major" | "all";
 const AIRPORT_PREF = "spotter.airports";
@@ -41,6 +43,12 @@ class ContactStore {
   watch = $state<string[]>([]);
   selectedId = $state<string | null>(null);
   track = $state<Leg[]>([]);
+  // A time rather than a point index, so the track refreshing on every poll does not move it; null is live.
+  scrubAt = $state<number | null>(null);
+  scrubbed = $derived(this.scrubAt === null ? null : positionAt(this.track, this.scrubAt));
+  airportList = $state<AirportPoint[]>([]);
+  /** Map coordinates to fit into view, set when a leg is picked. */
+  focus = $state<[number, number][] | null>(null);
   hideGround = $state(true);
   follow = $state(false);
   #airports = $state<AirportMode>(loadAirportMode());
@@ -104,6 +112,10 @@ class ContactStore {
 
   async start() {
     this.config = await api.config();
+    // Only names leg ends, so the page works without it.
+    loadAirports()
+      .then((a) => (this.airportList = a))
+      .catch(() => undefined);
     const tick = async () => {
       try {
         const [list, status, alerts, watch] = await Promise.all([
@@ -169,8 +181,22 @@ class ContactStore {
   async select(id: string | null) {
     this.selectedId = id;
     this.track = [];
+    this.scrubAt = null;
     if (!id) this.follow = false;
     if (id) await this.refreshTrack();
+  }
+
+  scrubTo(t: number | null) {
+    this.scrubAt = t;
+  }
+
+  /** Scrubs to the start of a leg and brings the whole leg into view; following would undo that fit. */
+  pickLeg(i: number) {
+    const leg = this.track[i];
+    if (!leg) return;
+    this.follow = false;
+    this.scrubTo(Date.parse(leg.start));
+    this.focus = leg.positions.map((p) => [p.lon, p.lat]);
   }
 
   private async refreshTrack() {

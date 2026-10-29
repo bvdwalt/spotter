@@ -4,6 +4,7 @@
   import { ageText, clockText, dateTimeText, durationText, fmtNum, navStatusText } from "./format";
   import { iataFlight, operator } from "./airlines";
   import { haversineKm } from "./geo";
+  import { legEnds } from "./airports";
 
   const c = $derived(store.selected);
 
@@ -31,6 +32,38 @@
     const remainingMs = speedKmh > 90 ? (toGoKm / speedKmh) * 3600_000 : null;
     return { toGoKm, totalKm, remainingMs, eta: remainingMs === null ? null : new Date(store.now + remainingMs) };
   });
+
+  /** The leg the slider spans: the one being scrubbed, else the newest. The newest runs up to the live position. */
+  const span = $derived.by(() => {
+    const legs = store.track;
+    if (!c || legs.length === 0) return null;
+    const i = store.scrubbed?.leg ?? legs.length - 1;
+    const last = i === legs.length - 1;
+    const start = Date.parse(legs[i].start);
+    const end = last ? Math.max(Date.parse(legs[i].end), Date.parse(c.seen)) : Date.parse(legs[i].end);
+    return { i, last, start, end };
+  });
+
+  /** Each leg's name, ends and times. The newest is active while the contact is still out flying or sailing it. */
+  const legRows = $derived.by(() => {
+    if (!c) return [];
+    const last = store.track.length - 1;
+    return store.track.map((leg, i) => {
+      const active = i === last && !c.on_ground;
+      const ends = legEnds(leg, store.airportList);
+      // An unfinished flight has not landed yet, so its scheduled destination stands in, marked as such.
+      const scheduled = active && !ends.to && c.route?.plausible ? c.route.to.iata || c.route.to.icao : undefined;
+      const start = Date.parse(leg.start);
+      const end = active ? Math.max(Date.parse(leg.end), Date.parse(c.seen)) : Date.parse(leg.end);
+      return { name: leg.callsign || `Leg ${i + 1}`, ...ends, scheduled, active, start, end };
+    });
+  });
+
+  function onScrub(e: Event & { currentTarget: HTMLInputElement }) {
+    const t = Number(e.currentTarget.value);
+    // The end of the newest leg is now, so dragging all the way right goes back to live.
+    store.scrubTo(span?.last && t >= span.end ? null : t);
+  }
 </script>
 
 {#if c}
@@ -111,9 +144,55 @@
       <dt>Seen</dt><dd>{ageText(c.seen, store.now)}</dd>
       {#if c.military}<dt>Flags</dt><dd class="alert">military</dd>{/if}
     </dl>
-    <p class="track">
-      Track: {store.track.reduce((n, l) => n + l.positions.length, 0)} points{#if store.track.length > 1}, {store.track.length} legs{/if}
-    </p>
+    {#if span}
+      <div class="track">
+        {#if store.track.length > 1}
+          <ol class="legs">
+            {#each legRows as row, i}
+              <li>
+                <button class:on={i === span.i} onclick={() => store.pickLeg(i)}>
+                  <span>
+                    {row.name}
+                    {#if row.from || row.to || row.scheduled}
+                      <span class="muted">
+                        {row.from ?? "?"} →
+                        {#if row.to}{row.to}{:else if row.scheduled}<span class="dim" title="scheduled">{row.scheduled}</span>{:else}?{/if}
+                      </span>
+                    {/if}
+                    {#if row.active}<span class="now">now</span>{/if}
+                  </span>
+                  <span class="muted">
+                    {clockText(new Date(row.start))}–{row.active ? "now" : clockText(new Date(row.end))} · {durationText(row.end - row.start)}
+                  </span>
+                </button>
+              </li>
+            {/each}
+          </ol>
+        {/if}
+        <input
+          type="range"
+          aria-label="Track time"
+          min={span.start}
+          max={span.end}
+          step={10_000}
+          value={store.scrubAt ?? span.end}
+          disabled={span.end <= span.start}
+          oninput={onScrub}
+        />
+        <div class="readout">
+          {#if store.scrubbed}
+            {@const s = store.scrubbed}
+            <span>
+              {clockText(new Date(s.time))} <span class="muted">{durationText(store.now - s.time)} ago</span>
+              · {s.on_ground ? "ground" : fmtNum(s.alt_ft, " ft")} · {fmtNum(s.speed_kt, " kt", 0)}
+            </span>
+            <button class="watch" onclick={() => store.scrubTo(null)}>live</button>
+          {:else}
+            <span class="muted">Live · drag to look back</span>
+          {/if}
+        </div>
+      </div>
+    {/if}
   </section>
 {/if}
 
@@ -217,8 +296,52 @@
     }
   }
   .track {
-    margin-top: 0.5rem;
-    font-size: 0.75rem;
-    color: #9a9a9a;
+    margin-top: 0.75rem;
+    font-size: 0.8rem;
+  }
+  .legs {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    margin-bottom: 0.5rem;
+  }
+  .legs button {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.5rem;
+    width: 100%;
+    padding: 0.3rem 0.5rem;
+    background: none;
+    border: 1px solid #2a2a2a;
+    border-radius: 4px;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+    text-align: left;
+  }
+  .legs button.on {
+    border-color: #4ecdc4;
+  }
+  .now {
+    margin-left: 0.3rem;
+    padding: 0 0.3rem;
+    border-radius: 3px;
+    background: #4ecdc4;
+    color: #111;
+    font-size: 0.65rem;
+    font-weight: 600;
+    text-transform: uppercase;
+  }
+  input[type="range"] {
+    width: 100%;
+    accent-color: #4ecdc4;
+  }
+  .readout {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.5rem;
+    min-height: 1.6rem;
   }
 </style>

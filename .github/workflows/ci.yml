@@ -31,7 +31,7 @@ jobs:
 
       - name: Build frontend
         if: hashFiles('web/package.json') != ''
-        run: cd web && npm install && npm run build
+        run: cd web && npm install && npm test && npm run build
 
       - name: Install dependencies
         run: go mod download
