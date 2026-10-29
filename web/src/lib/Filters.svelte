@@ -2,7 +2,13 @@
   import { store, type AirportMode } from "./contacts.svelte";
 
   let open = $state(false);
+  let up = $state(false);
   let root: HTMLDivElement;
+
+  // Open upward when the menu would run off the bottom of the screen (the sheet at peek or half).
+  function place(menu: HTMLDivElement) {
+    up = root.getBoundingClientRect().bottom + menu.offsetHeight + 8 > window.innerHeight;
+  }
 
   // Count the options that differ from the defaults so the button shows there is something to undo.
   const active = $derived(
@@ -43,7 +49,7 @@
     Filters{#if active > 0}<span class="badge">{active}</span>{/if}
   </button>
   {#if open}
-    <div class="menu" id="filters-menu" role="group" aria-label="Filters and map layers">
+    <div class="menu" class:up use:place id="filters-menu" role="group" aria-label="Filters and map layers">
       <div class="group">
         <span class="title">Show</span>
         <div class="segmented" role="radiogroup" aria-label="Contact kind">
@@ -134,6 +140,10 @@
     flex-direction: column;
     gap: 0.75rem;
     font-size: 0.85rem;
+  }
+  .menu.up {
+    top: auto;
+    bottom: calc(100% + 0.4rem);
   }
   .group {
     display: flex;
