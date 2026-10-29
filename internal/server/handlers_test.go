@@ -23,8 +23,9 @@ func (fakeSource) Status() model.SourceStatus { return model.SourceStatus{Name: 
 func newTestServer() http.Handler {
 	store := track.New(track.Options{AircraftExpiry: time.Minute, VesselExpiry: time.Minute, TrackWindow: time.Minute, TrackMinInterval: time.Second})
 	store.Upsert(model.Contact{ID: "a:1", Kind: model.KindAircraft, Label: "TEST1", Lat: 1, Lon: 1, Seen: time.Now()})
-	alerts := alert.New(alert.Options{Cooldown: time.Hour}, nil)
-	alerts.Observe(context.Background(), model.Contact{ID: "a:9", Label: "MAYDAY", Squawk: "7700", Seen: time.Now()})
+	alerts := alert.New(alert.Options{WatchList: []string{"9"}, Cooldown: time.Hour}, nil)
+	alerts.Observe(context.Background(), model.Contact{ID: "a:9", Label: "WATCHED", Seen: time.Now()})
+	alerts.Observe(context.Background(), model.Contact{ID: "a:8", Label: "PLAIN", Military: true, Squawk: "7700", Seen: time.Now()})
 	return New(Deps{Store: store, Alerts: alerts, Sources: []model.StatusReporter{fakeSource{}}, Version: "test"})
 }
 
@@ -65,7 +66,7 @@ func TestAlerts(t *testing.T) {
 	}
 	a := body["alerts"].([]any)[0].(map[string]any)
 	rec := httptest.NewRecorder()
-	h.ServeHTTP(rec, httptest.NewRequest(http.MethodDelete, "/api/alerts/emergency/a%3A9?at="+url.QueryEscape(a["time"].(string)), nil))
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodDelete, "/api/alerts/watchlist/a%3A9?at="+url.QueryEscape(a["time"].(string)), nil))
 	if rec.Code != 204 {
 		t.Fatalf("dismiss: %d %s", rec.Code, rec.Body.String())
 	}
@@ -100,13 +101,14 @@ func TestWatchEndpoints(t *testing.T) {
 	if code := do(http.MethodPut, "/api/watch/v%3A123"); code != 204 {
 		t.Fatalf("watch: %d", code)
 	}
-	if _, body := get(t, h, "/api/watch"); len(body["watch"].([]any)) != 1 || body["watch"].([]any)[0] != "123" {
+	// "9" is watched by newTestServer; the list is sorted.
+	if _, body := get(t, h, "/api/watch"); len(body["watch"].([]any)) != 2 || body["watch"].([]any)[0] != "123" {
 		t.Fatalf("watch list: %v", body)
 	}
 	if code := do(http.MethodDelete, "/api/watch/v%3A123"); code != 204 {
 		t.Fatalf("unwatch: %d", code)
 	}
-	if _, body := get(t, h, "/api/watch"); len(body["watch"].([]any)) != 0 {
+	if _, body := get(t, h, "/api/watch"); len(body["watch"].([]any)) != 1 || body["watch"].([]any)[0] != "9" {
 		t.Fatalf("after unwatch: %v", body)
 	}
 }

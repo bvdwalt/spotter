@@ -26,9 +26,6 @@ func (n *NtfySink) Send(ctx context.Context, a Alert) error {
 	}
 	req.Header.Set("Title", a.Title)
 	req.Header.Set("Tags", tagsFor(a))
-	if a.Rule == "emergency" {
-		req.Header.Set("Priority", "high")
-	}
 	if n.Token != "" {
 		req.Header.Set("Authorization", "Bearer "+n.Token)
 	}
@@ -48,12 +45,5 @@ func tagsFor(a Alert) string {
 	if a.Kind == "vessel" {
 		kind = "ship"
 	}
-	switch a.Rule {
-	case "emergency":
-		return "rotating_light," + kind
-	case "military":
-		return "military_helmet," + kind
-	default:
-		return "eyes," + kind
-	}
+	return "eyes," + kind
 }

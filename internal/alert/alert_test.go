@@ -23,12 +23,11 @@ func TestRulesAndCooldown(t *testing.T) {
 		c    model.Contact
 		want []string
 	}{
-		{model.Contact{ID: "a:1", Label: "X", Squawk: "7700", Seen: now, AltFt: &alt}, []string{"emergency"}},
-		{model.Contact{ID: "a:1", Label: "X", Squawk: "7700", Seen: now.Add(time.Minute)}, nil}, // cooldown
-		{model.Contact{ID: "a:1", Label: "X", Squawk: "7700", Seen: now.Add(2 * time.Hour)}, []string{"emergency"}},
-		{model.Contact{ID: "a:2", Label: "MIL", Military: true, Emergency: "7600", Seen: now}, []string{"emergency", "military"}},
-		{model.Contact{ID: "a:abc123", Label: "W", Seen: now}, []string{"watchlist"}},
+		{model.Contact{ID: "a:abc123", Label: "W", Type: "A320", Seen: now, AltFt: &alt}, []string{"watchlist"}},
+		{model.Contact{ID: "a:abc123", Label: "W", Seen: now.Add(time.Minute)}, nil}, // cooldown
+		{model.Contact{ID: "a:abc123", Label: "W", Seen: now.Add(2 * time.Hour)}, []string{"watchlist"}},
 		{model.Contact{ID: "v:601972000", Label: "SHIP", Kind: model.KindVessel, Seen: now}, []string{"watchlist"}},
+		{model.Contact{ID: "a:2", Label: "MIL", Military: true, Emergency: "7600", Squawk: "7700", Seen: now}, nil}, // not watched
 		{model.Contact{ID: "a:3", Label: "plain", Squawk: "1200", Seen: now}, nil},
 	}
 	for i, tc := range cases {
@@ -47,22 +46,22 @@ func TestRulesAndCooldown(t *testing.T) {
 			}
 		}
 	}
-	if len(rec.sent) != 6 || len(e.Recent()) != 6 {
-		t.Errorf("sent %d, recent %d, want 6", len(rec.sent), len(e.Recent()))
+	if len(rec.sent) != 3 || len(e.Recent()) != 3 {
+		t.Errorf("sent %d, recent %d, want 3", len(rec.sent), len(e.Recent()))
 	}
-	if rec.sent[0].Message != "General emergency squawk. 35000 ft, 0 km from home" {
-		t.Errorf("message = %q", rec.sent[0].Message)
+	if rec.sent[0].Title != "Watch list: W" || rec.sent[0].Message != "A320 35000 ft, 0 km from home" {
+		t.Errorf("title = %q, message = %q", rec.sent[0].Title, rec.sent[0].Message)
 	}
-	if got := rec.sent[4].Message; got != "0 km from home" {
+	if got := rec.sent[2].Message; got != "0 km from home" {
 		t.Errorf("empty type and reg should not leave a leading space, got %q", got)
 	}
 }
 
 func TestNtfySink(t *testing.T) {
-	var gotTitle, gotPrio, gotAuth, gotBody string
+	var gotTitle, gotTags, gotAuth, gotBody string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		gotTitle = r.Header.Get("Title")
-		gotPrio = r.Header.Get("Priority")
+		gotTags = r.Header.Get("Tags")
 		gotAuth = r.Header.Get("Authorization")
 		b := make([]byte, 64)
 		n, _ := r.Body.Read(b)
@@ -70,21 +69,21 @@ func TestNtfySink(t *testing.T) {
 	}))
 	defer srv.Close()
 	s := NewNtfy(srv.URL, "tok")
-	err := s.Send(context.Background(), Alert{Rule: "emergency", Title: "T", Message: "M"})
+	err := s.Send(context.Background(), Alert{Rule: "watchlist", Kind: model.KindVessel, Title: "T", Message: "M"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if gotTitle != "T" || gotPrio != "high" || gotAuth != "Bearer tok" || gotBody != "M" {
-		t.Errorf("got %q %q %q %q", gotTitle, gotPrio, gotAuth, gotBody)
+	if gotTitle != "T" || gotTags != "eyes,ship" || gotAuth != "Bearer tok" || gotBody != "M" {
+		t.Errorf("got %q %q %q %q", gotTitle, gotTags, gotAuth, gotBody)
 	}
 }
 
 func TestClearAndDismiss(t *testing.T) {
-	e := New(Options{Cooldown: time.Hour}, nil)
+	e := New(Options{WatchList: []string{"1", "2"}, Cooldown: time.Hour}, nil)
 	now := time.Unix(1_700_000_000, 0)
-	e.Observe(context.Background(), model.Contact{ID: "a:1", Squawk: "7700", Seen: now})
-	e.Observe(context.Background(), model.Contact{ID: "a:2", Military: true, Seen: now})
-	if !e.Dismiss("emergency", "a:1", now) || e.Dismiss("emergency", "a:1", now) {
+	e.Observe(context.Background(), model.Contact{ID: "a:1", Seen: now})
+	e.Observe(context.Background(), model.Contact{ID: "a:2", Seen: now})
+	if !e.Dismiss("watchlist", "a:1", now) || e.Dismiss("watchlist", "a:1", now) {
 		t.Error("dismiss should succeed once")
 	}
 	if len(e.Recent()) != 1 {
@@ -94,7 +93,7 @@ func TestClearAndDismiss(t *testing.T) {
 	if len(e.Recent()) != 0 {
 		t.Error("clear should empty recent")
 	}
-	if got := e.Observe(context.Background(), model.Contact{ID: "a:1", Squawk: "7700", Seen: now.Add(time.Minute)}); len(got) != 0 {
+	if got := e.Observe(context.Background(), model.Contact{ID: "a:1", Seen: now.Add(time.Minute)}); len(got) != 0 {
 		t.Error("cooldown should survive clear")
 	}
 }

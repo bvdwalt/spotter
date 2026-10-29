@@ -88,7 +88,7 @@ export interface Photo {
 }
 
 export interface Alert {
-  rule: "emergency" | "military" | "watchlist";
+  rule: "watchlist";
   contact_id: string;
   label: string;
   kind: Kind;

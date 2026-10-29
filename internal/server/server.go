@@ -18,14 +18,14 @@ import (
 )
 
 type ClientConfig struct {
-	HomeLat         float64 `json:"home_lat"`
-	HomeLon         float64 `json:"home_lon"`
-	RadiusNM        float64 `json:"radius_nm"`
-	AircraftExpiryS float64 `json:"aircraft_expiry_s"`
-	VesselExpiryS   float64 `json:"vessel_expiry_s"`
-	TrackWindowS    float64 `json:"track_window_s"`
-	PollIntervalS   float64 `json:"poll_interval_s"`
-	BasemapURL      string  `json:"basemap_url,omitempty"` // set when a local PMTiles basemap is served
+	HomeLat         float64        `json:"home_lat"`
+	HomeLon         float64        `json:"home_lon"`
+	RadiusNM        float64        `json:"radius_nm"`
+	AircraftExpiryS float64        `json:"aircraft_expiry_s"`
+	VesselExpiryS   float64        `json:"vessel_expiry_s"`
+	TrackWindowS    float64        `json:"track_window_s"`
+	PollIntervalS   float64        `json:"poll_interval_s"`
+	BasemapURL      string         `json:"basemap_url,omitempty"` // set when a local PMTiles basemap is served
 	ADSBCircles     []model.Circle `json:"adsb_circles"`
 	AISBBox         *[2][2]float64 `json:"ais_bbox,omitempty"` // [[latSW, lonSW], [latNE, lonNE]]; set when ships are enabled
 }

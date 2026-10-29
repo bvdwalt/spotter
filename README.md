@@ -114,10 +114,9 @@ area with `just airports "lonW,latS,lonE,latN"`.
 
 ## Alerts
 
-Three rules, evaluated on every update: emergency squawks (7500, 7600, 7700),
-aircraft flagged military by the aggregator, and contacts on `WATCH_LIST`. Each
-alert shows in the sidebar and, when `NTFY_URL` is set, is posted to ntfy with a
-title, tags, and high priority for emergencies.
+Alerts are opt-in: a contact alerts only when it is on the watch list, either
+via `WATCH_LIST` or the watch button in the panel. Each alert shows in the
+sidebar and, when `NTFY_URL` is set, is posted to ntfy with a title and tags.
 
 ## Development
 

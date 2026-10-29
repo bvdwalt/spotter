@@ -1,4 +1,4 @@
-// Package alert raises notifications for interesting contacts: emergencies, military, and a watch list.
+// Package alert raises notifications for contacts on the watch list.
 package alert
 
 import (
@@ -14,7 +14,7 @@ import (
 )
 
 type Alert struct {
-	Rule      string     `json:"rule"` // emergency | military | watchlist
+	Rule      string     `json:"rule"` // watchlist
 	ContactID string     `json:"contact_id"`
 	Label     string     `json:"label"`
 	Kind      model.Kind `json:"kind"`
@@ -144,35 +144,14 @@ func (e *Engine) Dismiss(rule, contactID string, at time.Time) bool {
 }
 
 func (e *Engine) evaluate(c model.Contact) []Alert {
-	var out []Alert
-	now := c.Seen
-	where := describeWhere(c)
-	if c.Emergency != "" || isEmergencySquawk(c.Squawk) {
-		code := c.Emergency
-		if code == "" {
-			code = c.Squawk
-		}
-		out = append(out, Alert{
-			Rule: "emergency", ContactID: c.ID, Label: c.Label, Kind: c.Kind, Time: now,
-			Title:   "Emergency " + code + ": " + c.Label,
-			Message: joinParts(emergencyText(code), where),
-		})
+	if !e.Watching(c.ID) {
+		return nil
 	}
-	if c.Military {
-		out = append(out, Alert{
-			Rule: "military", ContactID: c.ID, Label: c.Label, Kind: c.Kind, Time: now,
-			Title:   "Military: " + c.Label,
-			Message: joinParts(c.Type, c.Reg, where),
-		})
-	}
-	if e.Watching(c.ID) {
-		out = append(out, Alert{
-			Rule: "watchlist", ContactID: c.ID, Label: c.Label, Kind: c.Kind, Time: now,
-			Title:   "Watch list: " + c.Label,
-			Message: joinParts(c.Type, c.Reg, where),
-		})
-	}
-	return out
+	return []Alert{{
+		Rule: "watchlist", ContactID: c.ID, Label: c.Label, Kind: c.Kind, Time: c.Seen,
+		Title:   "Watch list: " + c.Label,
+		Message: joinParts(c.Type, c.Reg, describeWhere(c)),
+	}}
 }
 
 func (e *Engine) shouldFire(a Alert) bool {
@@ -188,23 +167,6 @@ func (e *Engine) shouldFire(a Alert) bool {
 		e.recent = e.recent[len(e.recent)-e.opts.Keep:]
 	}
 	return true
-}
-
-func isEmergencySquawk(s string) bool {
-	return s == "7500" || s == "7600" || s == "7700"
-}
-
-func emergencyText(code string) string {
-	switch code {
-	case "7500":
-		return "Hijack squawk."
-	case "7600":
-		return "Radio failure squawk."
-	case "7700":
-		return "General emergency squawk."
-	default:
-		return "Emergency: " + code + "."
-	}
 }
 
 func describeWhere(c model.Contact) string {
