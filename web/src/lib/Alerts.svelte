@@ -118,13 +118,6 @@
     color: #9a9a9a;
     white-space: nowrap;
   }
-  li.emergency .title {
-    color: #ff4757;
-    font-weight: 600;
-  }
-  li.military .title {
-    color: #ff9f43;
-  }
   li.watchlist .title {
     color: #4ecdc4;
   }
